@@ -30,12 +30,35 @@ export class NoDatabaseError extends Error {
   }
 }
 
+/**
+ * The env handed to us by a non-request invocation, or null.
+ *
+ * OpenNext publishes the Cloudflare context through an AsyncLocalStorage store
+ * that only its `fetch` handler ever opens. A cron trigger arrives at
+ * `scheduled()` instead, so `getCloudflareContext()` throws there and every
+ * binding — D1 included — reads as absent. That is not theoretical: it is why
+ * the `heartbeats` table sat empty while three cron triggers fired on schedule.
+ *
+ * The store's global is installed as a getter-only property, so it cannot be
+ * populated from outside. This module-level fallback is the way in. It is only
+ * consulted when the real context is missing, so a request never sees it.
+ */
+let workerEnv: CloudflareEnv | null = null;
+
+/**
+ * Hand the bindings to code running outside a request — `scheduled()`, and
+ * nothing else today. Called once per invocation by `worker/index.ts`.
+ */
+export function setWorkerEnv(env: CloudflareEnv): void {
+  workerEnv = env;
+}
+
 /** The Cloudflare env, or null when running outside a Worker. */
 export function cfEnv(): CloudflareEnv | null {
   try {
-    return getCloudflareContext().env as CloudflareEnv;
+    return (getCloudflareContext().env as CloudflareEnv) ?? workerEnv;
   } catch {
-    return null;
+    return workerEnv;
   }
 }
 

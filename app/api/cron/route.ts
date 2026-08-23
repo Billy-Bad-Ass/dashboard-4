@@ -1,10 +1,10 @@
 /**
  * HTTP entry point for the heartbeat.
  *
- * Cloudflare cron triggers normally arrive at a Worker's `scheduled()` handler,
- * but OpenNext owns the Worker entry point, so the tick is exposed here and the
- * custom entry in `worker/index.ts` calls it. That also makes it triggerable by
- * hand, which is how you verify a deployment without waiting ten minutes:
+ * The cron triggers do NOT come through here — they land on `scheduled()` in
+ * `worker/index.ts`, which calls `runTick` directly rather than looping back
+ * through HTTP. This route is the manual handle on the same tick, which is how
+ * you verify a deployment without waiting ten minutes for the next one:
  *
  *   curl -H "Authorization: Bearer $DASHBOARD_TOKEN" \
  *        https://<worker>/api/cron?cadence=fast

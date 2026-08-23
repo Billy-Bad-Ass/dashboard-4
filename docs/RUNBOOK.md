@@ -138,6 +138,17 @@ Check in order:
 3. Cloudflare dashboard → Workers → your worker → Triggers. Confirm the cron
    entries exist. They are created from `wrangler.jsonc` on deploy, and a deploy
    that failed part-way can leave them missing.
+4. `wrangler.jsonc` → `main`. It must point at `worker/index.ts`, never at
+   `.open-next/worker.js`. The generated OpenNext worker has no `scheduled`
+   handler, so with `main` aimed at it the triggers fire into nothing and the
+   `heartbeats` table simply stays empty — the dashboard renders, the Triggers
+   tab looks correct, and Cron Events shows invocations. This exact
+   misconfiguration shipped once; `tests/scheduled.test.mts` guards the half of
+   it that is testable off-Worker.
+
+If the manual tick in step 2 works but the scheduled one does not, that is the
+signature: HTTP has a Cloudflare request context and `scheduled()` does not.
+`setWorkerEnv()` in `lib/db.ts` is what closes that gap.
 
 ### GitHub connector says the token was rejected
 
