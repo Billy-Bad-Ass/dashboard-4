@@ -2,12 +2,13 @@
   "name": "bba-heartbeat",
   "version": "0.1.0",
   "private": true,
-  "description": "BBA Network — live heartbeat dashboard for the project portfolio",
+  "description": "BBA Network \u2014 live heartbeat dashboard for the project portfolio",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "dev": "next dev",
+    "setup": "node scripts/setup.mjs",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -25,6 +26,7 @@
     "workflows:check": "node scripts/check-workflows.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
     "next": "^15.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

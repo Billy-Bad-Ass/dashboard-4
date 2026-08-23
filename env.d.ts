@@ -19,6 +19,8 @@ declare global {
     CLOUDFLARE_ACCOUNT_ID?: string;
     /** Secret address of the Google Calendar private ICS feed. */
     CALENDAR_ICS_URL?: string;
+    /** Powers "Ask the dashboard" (/ask) and the scheduled agents. */
+    ANTHROPIC_API_KEY?: string;
     /** Shared secret for the write API and the cron-triggered agent dispatch. */
     DASHBOARD_TOKEN?: string;
   }

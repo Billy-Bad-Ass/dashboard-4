@@ -5,6 +5,21 @@ to do when a part of it stops.
 
 ## First deploy
 
+### The short version
+
+```bash
+npm install
+npm run setup
+```
+
+`npm run setup` does steps 1 to 4 below interactively — creates the storage,
+writes the ids into `wrangler.jsonc`, applies the migrations, walks through each
+secret explaining where to get it, writes `.dev.vars`, and offers to deploy. It
+is idempotent, so a half-finished run can just be re-run.
+
+The rest of this section is what it does, for when you want to do it by hand or
+something goes wrong part way.
+
 ### 1. Create the storage
 
 ```bash
@@ -53,6 +68,7 @@ Where each comes from:
 | `CLOUDFLARE_ACCOUNT_ID` | The hex string in your Cloudflare dashboard URL. |
 | `CALENDAR_ICS_URL` | Google Calendar → Settings → the calendar → **Secret address in iCal format**. Treat it as a password: anyone holding it can read the calendar. Regenerating it in Google revokes the old one. |
 | `DASHBOARD_TOKEN` | Any long random string. Guards every write endpoint. |
+| `ANTHROPIC_API_KEY` | console.anthropic.com → API keys. Powers the `/ask` page and every scheduled agent. |
 
 ### 4. Deploy
 
@@ -140,6 +156,26 @@ curl -H "Authorization: Bearer $DASHBOARD_TOKEN" "<worker>/api/cron?cadence=dail
 
 Check the key is in **live mode** if you expect live revenue. A test-mode key
 reports test-mode charges perfectly happily, and they look real.
+
+### The Ask page says the key is missing but it is set
+
+Secrets set with `wrangler secret put` only reach a Worker that has been
+deployed at least once. If you set it before the first deploy, run
+`npm run cf:deploy` and then set it again.
+
+Locally, `/ask` reads `.dev.vars`, not your shell environment — an exported
+`ANTHROPIC_API_KEY` in your terminal will not be picked up by `wrangler dev`.
+
+### Ask gives an answer that looks wrong
+
+Every answer shows what it looked up — expand the reasoning and read the tool
+lines. The most common cause of a surprising number is a question that a raw
+`SELECT SUM(amount_pence) FROM spend` answers differently from the dashboard,
+because that query does not expand recurring subscriptions. The model is told to
+use the finance tool for totals for exactly this reason, but a narrowly-worded
+question can still steer it to raw SQL.
+
+It cannot write anything, so a wrong answer is never a wrong change.
 
 ### Calendar feed returns 404
 

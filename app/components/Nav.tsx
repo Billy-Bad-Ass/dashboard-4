@@ -32,6 +32,7 @@ const HEALTH_DOT: Record<Health, string> = {
 
 const SECTIONS = [
   { href: '/', icon: 'gauge-high', label: 'Heartbeat' },
+  { href: '/ask', icon: 'crosshairs', label: 'Ask' },
   { href: '/finance', icon: 'sterling-sign', label: 'Money' },
   { href: '/clients', icon: 'users', label: 'Clients' },
   { href: '/agents', icon: 'robot', label: 'Agents' },
