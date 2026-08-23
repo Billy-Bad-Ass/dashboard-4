@@ -1,0 +1,24 @@
+# Local development secrets. Copy to .dev.vars (gitignored) and fill in.
+#
+# Every one of these is optional — the dashboard runs without any of them and
+# shows each connector as "not connected" with the command to fix it. Add them
+# one at a time and watch /setup go green.
+
+# Restricted key with READ scopes only. Charges, Balance, Products, Disputes.
+STRIPE_SECRET_KEY=
+
+# Optional for public repos (60 req/hour is enough for a 10-minute cron).
+# Required for private ones. Fine-grained PAT, read-only.
+GITHUB_TOKEN=
+
+# Custom token with "Account Analytics: Read" and nothing else.
+CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_ACCOUNT_ID=
+
+# Google Calendar → Settings → the calendar → "Secret address in iCal format".
+# Treat this as a password.
+CALENDAR_ICS_URL=
+
+# Guards every write endpoint. `openssl rand -hex 32`.
+# Leaving this empty means writes are OPEN — fine locally, never in production.
+DASHBOARD_TOKEN=

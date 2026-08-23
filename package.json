@@ -1,0 +1,42 @@
+{
+  "name": "bba-heartbeat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BBA Network — live heartbeat dashboard for the project portfolio",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import ./tests/register.mjs --test \"tests/*.test.mts\"",
+    "check": "npm run typecheck && npm run test",
+    "icons:build": "node scripts/build-icons.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply bba-heartbeat --local",
+    "db:migrate:remote": "wrangler d1 migrations apply bba-heartbeat --remote",
+    "db:seed:local": "wrangler d1 execute bba-heartbeat --local --file=db/seed.sql",
+    "db:seed:remote": "wrangler d1 execute bba-heartbeat --remote --file=db/seed.sql",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:types": "wrangler types",
+    "workflows:check": "node scripts/check-workflows.mjs"
+  },
+  "dependencies": {
+    "next": "^15.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "stripe": "^19.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260823.1",
+    "@opennextjs/cloudflare": "^1.20.2",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.86.0"
+  }
+}
