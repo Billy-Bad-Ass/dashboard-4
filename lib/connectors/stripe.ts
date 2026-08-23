@@ -21,6 +21,12 @@ export interface StripeCharge {
   feePence: number;
   currency: string;
   description: string | null;
+  /**
+   * What the buyer sees on their statement. This is the attribution key: with
+   * more than one project selling through the same Stripe account it is the
+   * only per-charge signal that says which business earned it.
+   */
+  statementDescriptor: string | null;
   status: string;
 }
 
@@ -103,6 +109,10 @@ export async function fetchStripe(sinceDays = 90): Promise<ConnectorResult<Strip
         feePence: fee,
         currency: charge.currency,
         description: charge.description,
+        // calculated_ is what Stripe actually sent to the bank; the raw field
+        // is null whenever the account-level default was used.
+        statementDescriptor:
+          charge.calculated_statement_descriptor ?? charge.statement_descriptor ?? null,
         status: charge.status,
       });
     }

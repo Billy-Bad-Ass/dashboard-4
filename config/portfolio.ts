@@ -38,6 +38,22 @@ export interface Project {
   icon: string;
   /** Live URL, once there is one. */
   liveUrl?: string;
+  /**
+   * How to recognise this project's charges in Stripe.
+   *
+   * Needed from the moment a second project started selling. Before that the
+   * reconciler took "the first project whose revenueModel is stripe", which was
+   * fine with one seller and silently wrong with two — a $100 audit would have
+   * landed on the store's ROI.
+   *
+   * Matched case-insensitively against the charge's statement descriptor and
+   * description. A charge that matches nothing is NOT guessed at: it is
+   * recorded as unattributed and shown as such.
+   */
+  stripeMatch?: {
+    descriptors?: string[];
+    products?: string[];
+  };
   /** ISO date the work started. Used for burn-rate and time-to-first-pound. */
   startedOn: string;
   /**
@@ -79,59 +95,67 @@ export const MONEY_UNIT = 'minor' as const;
 export const PROJECTS: Project[] = [
   {
     slug: 'project-1',
-    name: 'pSEO Forge',
-    tagline: 'Programmatic-SEO affiliate engine running on free-tier APIs.',
+    name: 'Website Health Check',
+    tagline: 'A plain-English website audit, delivered within a working day. $100.',
     repo: 'Billy-Bad-Ass/Project-1',
-    stage: 'building',
-    revenueModel: 'affiliate',
+    stage: 'shipped',
+    revenueModel: 'stripe',
     accent: '#2B5CE6',
     icon: 'magnifying-glass-chart',
     startedOn: '2026-08-22',
+    stripeMatch: {
+      descriptors: ['BBA NETWORK AUDIT'],
+      products: ['prod_V7tZMsJQTM8AMG'],
+    },
     reality:
-      'The engine is finished and rebuilds itself daily on free CI. It earns nothing because ' +
-      'monetisationEnabled is false — there are no affiliate accounts behind it yet. Until that ' +
-      'flips, every "revenue" number on this page is correctly zero and the numbers worth ' +
-      'watching are indexable pages and dataset health.',
+      'The first thing in this portfolio that a stranger can actually buy. Live in Stripe at ' +
+      '$100 one-time, sold through a Payment Link with no webhook — fulfilment polls Stripe ' +
+      'when you run it, which is why there is no server to keep online and no signing secret to ' +
+      'leak. Delivery is promised within a working day, so a human still has to run the ' +
+      'command; nothing here is passive income. ' +
+      'The repository also still contains pSEO Forge, the programmatic-SEO affiliate engine ' +
+      'this project started as. That engine is finished but unmonetised, and the audit is what ' +
+      'is being sold — the README has not caught up.',
     gates: [
-      'Hold an approved affiliate account (Amazon Associates, CJ, or similar)',
-      'Set monetisationEnabled = true in config/site.config.ts',
-      'Give it its own domain — NOT a bbanetwork.org subdomain (see docs/DOMAINS.md)',
-      'Submit the sitemap and get pages indexed',
+      'Sell one. Everything else here is theory until a stranger pays $100',
+      'Time the fulfilment run end to end — "within a working day" is a promise you have made',
+      'Find prospects at a rate that outpaces the ones you burn',
+      'Decide whether the pSEO engine in src/ is still worth carrying, or is dead weight',
     ],
     vitals: [
       {
-        key: 'indexable_pages',
-        label: 'Indexable pages',
-        source: 'manual',
-        unit: 'count',
-        target: 400,
-        hint: 'Items with at least one offer. Thin pages are suppressed, not published.',
+        key: 'revenue',
+        label: 'Revenue',
+        source: 'stripe',
+        unit: 'gbp',
+        target: null,
+        hint: 'Net of refunds, matched to this project by its Stripe statement descriptor.',
       },
       {
-        key: 'suppressed_ratio',
-        label: 'Suppressed',
-        source: 'manual',
+        key: 'units',
+        label: 'Audits sold',
+        source: 'stripe',
+        unit: 'count',
+        target: null,
+        hint: 'Paid charges. Each one is a report a human has to actually write and send.',
+      },
+      {
+        key: 'refund_rate',
+        label: 'Refund rate',
+        source: 'stripe',
         unit: 'percent',
         lowerIsBetter: true,
-        target: 15,
-        hint: 'A spike here usually means an upstream API changed shape.',
+        target: 5,
+        hint: 'On a delivered service a refund means the report missed. Read it as feedback.',
       },
       {
-        key: 'dataset_age_days',
-        label: 'Dataset age',
+        key: 'days_since_commit',
+        label: 'Days since commit',
         source: 'github',
         unit: 'days',
         lowerIsBetter: true,
-        target: 2,
-        hint: 'Days since the refresh workflow last committed a dataset.',
-      },
-      {
-        key: 'affiliate_revenue',
-        label: 'Affiliate revenue',
-        source: 'ledger',
-        unit: 'gbp',
-        target: null,
-        hint: 'Entered manually from network dashboards — affiliates have no usable live API.',
+        target: 14,
+        hint: 'Days since the repository last moved.',
       },
     ],
   },
@@ -146,6 +170,9 @@ export const PROJECTS: Project[] = [
     icon: 'credit-card',
     liveUrl: 'https://bba-network-store.bbacentralworkspace.workers.dev',
     startedOn: '2026-08-23',
+    stripeMatch: {
+      descriptors: ['BBA NETWORK', 'BBA NETWORK STORE'],
+    },
     reality:
       'Four SKUs built, on Workers with Stripe Checkout and R2 delivery. Live-mode Stripe ' +
       'currently holds no products and has taken no payments, so this is shipped but not yet ' +
@@ -360,7 +387,106 @@ export const PROJECTS: Project[] = [
       },
     ],
   },
+  {
+    slug: 'project-6',
+    name: 'BBA Network Web',
+    tagline: 'The public face — brand hub, storefront and audit service across subdomains.',
+    repo: 'Billy-Bad-Ass/Project-6',
+    stage: 'building',
+    revenueModel: 'none',
+    accent: '#0E7490',
+    icon: 'circle-nodes',
+    startedOn: '2026-08-23',
+    reality:
+      'The shopfront, not a business. It earns nothing itself: a visitor who buys an audit is ' +
+      'revenue for project-1 and one who buys a guide is revenue for project-2, and attributing ' +
+      'a sale here would double-count it. What it owns is whether a stranger who lands on ' +
+      'bbanetwork.org understands what is on offer and gets to the right place — which is ' +
+      'currently the binding constraint on both of the projects that DO earn, since neither has ' +
+      'ever been put in front of anyone.',
+    gates: [
+      'Put the brand hub on the apex, with each business one click away',
+      'Point guides. and audit. at the storefront and the audit service',
+      'Get one stranger to the audit page who did not come from you',
+      'Make the audit page good enough that arriving and paying is one decision',
+    ],
+    vitals: [
+      {
+        key: 'commits',
+        label: 'Commits',
+        source: 'github',
+        unit: 'count',
+        target: null,
+        hint: 'Build activity. It has no revenue signal of its own by design.',
+      },
+      {
+        key: 'days_since_commit',
+        label: 'Days since commit',
+        source: 'github',
+        unit: 'days',
+        lowerIsBetter: true,
+        target: 14,
+        hint: 'Days since the repository last moved.',
+      },
+      {
+        key: 'visitors',
+        label: 'Visitors',
+        source: 'cloudflare',
+        unit: 'count',
+        target: null,
+        hint: 'Traffic to the public site. Unknown until it is deployed and the token is set.',
+      },
+    ],
+  },
 ];
+
+/** What a Stripe charge needs to expose for attribution. */
+export interface ChargeIdentity {
+  statementDescriptor?: string | null;
+  description?: string | null;
+  productIds?: string[];
+}
+
+/**
+ * Which project earned a charge.
+ *
+ * Returns null rather than guessing. An unattributed charge is a real state
+ * with a real answer — "we do not know which business this was" — and inventing
+ * one puts money on the wrong project's ROI permanently.
+ *
+ * Specificity wins. "BBA NETWORK" and "BBA NETWORK AUDIT" both match a charge
+ * descriptored the latter, so candidates are tried longest-first: the audit
+ * takes its own charges and the store keeps the rest. Getting this backwards is
+ * the exact bug this function exists to prevent.
+ */
+export function projectForCharge(
+  charge: ChargeIdentity,
+  projects: Project[] = PROJECTS,
+): Project | null {
+  // A product id is unambiguous, so it is checked before any text.
+  if (charge.productIds?.length) {
+    for (const project of projects) {
+      const owned = project.stripeMatch?.products ?? [];
+      if (owned.some((id) => charge.productIds!.includes(id))) return project;
+    }
+  }
+
+  const haystack = `${charge.statementDescriptor ?? ''} ${charge.description ?? ''}`
+    .toLowerCase()
+    .trim();
+  if (!haystack) return null;
+
+  const candidates = projects.flatMap((project) =>
+    (project.stripeMatch?.descriptors ?? []).map((descriptor) => ({
+      project,
+      descriptor: descriptor.toLowerCase(),
+    })),
+  );
+  // Longest descriptor first — specificity beats declaration order.
+  candidates.sort((a, b) => b.descriptor.length - a.descriptor.length);
+
+  return candidates.find(({ descriptor }) => haystack.includes(descriptor))?.project ?? null;
+}
 
 export function projectBySlug(slug: string): Project | undefined {
   return PROJECTS.find((p) => p.slug === slug);

@@ -19,7 +19,7 @@
  *    the API keys are never touched during a request.
  */
 
-import { PROJECTS, type Project, type Stage } from '@/config/portfolio';
+import { PROJECTS, projectForCharge, type Project, type Stage } from '@/config/portfolio';
 import { getCache, query, execute, hasDatabase } from './db';
 import { loadFinance, type PortfolioFinance, type ProjectFinance } from './finance';
 import { loadPipeline, type PipelineSummary } from './crm';
@@ -232,6 +232,43 @@ function resolveVitals(
   return out;
 }
 
+/**
+ * The subset of a Stripe snapshot that belongs to one project.
+ *
+ * With one seller "the whole account" and "this project" were the same thing.
+ * With two they are not, and handing the full snapshot to both would show each
+ * of them the other's money.
+ */
+function sliceForProject(
+  snapshot: StripeSnapshot | null,
+  project: Project,
+): StripeSnapshot | null {
+  if (!snapshot) return null;
+
+  const mine = snapshot.charges.filter(
+    (charge) =>
+      projectForCharge({
+        statementDescriptor: charge.statementDescriptor,
+        description: charge.description,
+      })?.slug === project.slug,
+  );
+
+  const gross = mine.reduce((a, c) => a + c.amountPence, 0);
+  const refunded = mine.reduce((a, c) => a + c.refundedPence, 0);
+  const fees = mine.reduce((a, c) => a + c.feePence, 0);
+
+  return {
+    ...snapshot,
+    charges: mine,
+    units: mine.length,
+    grossPence: gross,
+    refundedPence: refunded,
+    feesPence: fees,
+    netPence: gross - refunded - fees,
+    refundCount: mine.filter((c) => c.refundedPence > 0).length,
+  };
+}
+
 /** Latest stored value for every metric, keyed `slug:metric`. */
 async function latestMetrics(): Promise<Map<string, number>> {
   const rows = await query<{ project_slug: string; metric_key: string; value_num: number }>(
@@ -335,8 +372,10 @@ export async function pulse(options: { fresh?: boolean } = {}): Promise<Pulse> {
         project,
         repo,
         projectFinance,
-        // Stripe revenue belongs to whichever project actually sells through it.
-        project.revenueModel === 'stripe' ? stripeResult.data : null,
+        // Only this project's charges — see sliceForProject.
+        project.revenueModel === 'stripe'
+          ? sliceForProject(stripeResult.data, project)
+          : null,
         scopedStored,
         lastCronMinutes,
         connectorsLive,

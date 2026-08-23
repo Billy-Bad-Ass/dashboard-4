@@ -14,31 +14,44 @@ Workers plan. This is what to do with it — and one thing not to.
 Nothing is pointed automatically. Attaching a domain is four taps in the
 Cloudflare dashboard — see below.
 
-## Do not put Project 1 on this domain
+## The subdomain split
 
-Project 1 is a programmatic-SEO affiliate engine: a few hundred to a few
-thousand generated pages targeting search. Its own README is blunt that whether
-it earns anything "depends on niche choice, patience, and staying on the right
-side of search engines' scaled-content policies."
+Each business gets its own subdomain, with the apex as a hub that points at
+them. Project 6 owns the public face; the businesses keep their own repos.
 
-That is a bet worth taking. It is not a bet worth taking **with the domain your
-storefront sells from.**
+| Host | What | Owned by |
+| --- | --- | --- |
+| `bbanetwork.org` | Brand hub — what BBA Network is, and links out | Project 6 |
+| `audit.bbanetwork.org` | Website Health Check, $100 | Project 1 |
+| `guides.bbanetwork.org` | The printable guides storefront | Project 2 |
+| `heartbeat.bbanetwork.org` | This dashboard, behind Access | Project 4 |
 
-- Google's scaled-content-abuse policy applies to exactly this pattern. If it
-  goes wrong, it goes wrong as a manual action or an algorithmic suppression.
-- A subdomain is not a firewall. Google treats subdomains as part of the same
-  site when it suits them to, and reputational signals bleed both ways.
-- Affiliate SEO ranks better on a niche-branded domain anyway. A page about game
-  prices does better at a domain that is about game prices than at
-  `bbanetwork.org/best/...`, because the domain itself is a relevance signal.
+### This replaces an earlier warning, and why
 
-**Recommendation:** buy Project 1 its own cheap domain matched to whichever
-niche it ships with. Around $10–15/year, and it keeps `bbanetwork.org` clean if
-the experiment goes badly. Record it in the ledger against `project-1` so its
-ROI carries its own cost.
+An earlier version of this document said **"do not put Project 1 on this
+domain"**, because Project 1 was pSEO Forge — a programmatic-SEO affiliate
+engine generating hundreds of pages, with real scaled-content-policy risk. The
+argument was that you should not take that bet with the domain your storefront
+sells from.
 
-If you decide to use a subdomain anyway, that is a legitimate call — put it on
-`deals.bbanetwork.org` rather than a path, and know what you are accepting.
+**Project 1 has since pivoted.** It now sells a hand-delivered website audit at
+$100 through Stripe, and the pSEO engine sits unmonetised in the same
+repository. A human writing one report per customer carries none of the risk
+that warning was about, so the warning is withdrawn and `audit.` is correct.
+
+If the pSEO engine is ever switched on and pointed at this domain, the original
+argument comes back in full. It is dormant, not wrong.
+
+### The store moving off the apex
+
+Earlier guidance put the storefront at the apex on trust grounds — a bare brand
+domain is what people type. With more than one business under the brand, a hub
+that routes to them is the better structure, and the trust argument transfers to
+the hub.
+
+No redirect is needed. Nothing here has accumulated any search authority yet, so
+there is nothing to preserve — a 301 would be protecting a number that is
+currently zero.
 
 ## Email
 
