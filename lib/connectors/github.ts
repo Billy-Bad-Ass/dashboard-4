@@ -5,9 +5,15 @@
  * dashboard. Revenue is zero everywhere; commit cadence and CI colour are what
  * separate a project that is alive from one that has quietly stopped.
  *
- * Works unauthenticated against public repos (60 requests/hour, which the
- * ten-minute cron stays well inside). A token raises that to 5000 and is the
- * only way to see private repos.
+ * GITHUB_TOKEN is effectively required, despite every repo here being public.
+ * A full poll costs four calls per repo — metadata, commits, pulls, runs — so
+ * six repos on a ten-minute cron is 24 calls a tick and 144 an hour, against an
+ * unauthenticated ceiling of 60. It does not nearly fit, and it will not fit by
+ * adding a repo either. A token raises the ceiling to 5000, which does, and is
+ * also the only way to see a private repo.
+ *
+ * Unauthenticated still works for a single manual page load. It is the cron
+ * that cannot live there.
  */
 
 import { cfEnv } from '../db';

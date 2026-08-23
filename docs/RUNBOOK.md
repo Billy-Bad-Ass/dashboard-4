@@ -67,7 +67,7 @@ Where each comes from:
 | Secret | Where |
 | --- | --- |
 | `STRIPE_SECRET_KEY` | Stripe → Developers → API keys → **restricted key**. Grant read on Charges, Balance, Products, Disputes. Nothing else. |
-| `GITHUB_TOKEN` | GitHub → Settings → Developer settings → fine-grained PAT. Read-only on contents, metadata and actions for the four repos. Optional for public repos (60 req/hour unauthenticated is enough for a 10-minute cron); required for private ones. |
+| `GITHUB_TOKEN` | GitHub → Settings → Developer settings → fine-grained PAT. Read-only on contents, metadata and actions for the six repos. **Effectively required even though the repos are public**: a poll costs four calls per repo, so six repos every ten minutes is 144 calls an hour against an unauthenticated ceiling of 60. A token raises it to 5000. Also the only way to read a private repo. |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → Create custom token → **Account Analytics: Read** only. |
 | `CLOUDFLARE_ACCOUNT_ID` | The hex string in your Cloudflare dashboard URL. |
 | `CALENDAR_ICS_URL` | Google Calendar → Settings → the calendar → **Secret address in iCal format**. Treat it as a password: anyone holding it can read the calendar. Regenerating it in Google revokes the old one. |
@@ -152,12 +152,18 @@ signature: HTTP has a Cloudflare request context and `scheduled()` does not.
 
 ### GitHub connector says the token was rejected
 
-A 401 means a token was sent and refused: rotate it, or unset it entirely — the
-four repositories are public and work unauthenticated.
+A 401 means a token was sent and refused. Rotate it — do not just unset it. The
+repositories being public does not make the token optional: the cron's call
+volume is over twice the unauthenticated ceiling, so with no token the connector
+reports `failed` with a rate-limit reset time, permanently.
 
 A 403 that is *not* a rate limit means either the token is missing a scope or
 something between the Worker and GitHub blocked the request. The two are
 reported differently on purpose; the fixes are unrelated.
+
+A `failed` line reading "6 of 6 unreadable — rate limited until …" is the
+no-token state, not an outage. Set `GITHUB_TOKEN` and it clears on the next
+tick.
 
 ### Stripe shows revenue the dashboard does not
 
