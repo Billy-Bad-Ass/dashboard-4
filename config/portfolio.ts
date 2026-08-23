@@ -306,14 +306,19 @@ export const PROJECTS: Project[] = [
     icon: 'tower-broadcast',
     startedOn: '2026-08-23',
     reality:
-      'Not deployed — wrangler.toml still carries a placeholder database id. When it is, this ' +
-      'is the only project that deliberately SPENDS to make the others earn: ads on five ' +
-      'platforms, organic posting to nine, and Stripe revenue joined back to ad spend so the ' +
-      'number driving decisions is return on ad spend rather than clicks. Its revenue model is ' +
-      '"none" because it earns nothing itself; its cost is the point, and the thing to watch is ' +
-      'whether that cost turns into revenue somewhere else in the portfolio.',
+      'Half-deployed, and stuck on one line. Its D1 database exists and is fully migrated — 17 ' +
+      'tables including spend_ledger and revenue_events — and its R2 media bucket exists. But ' +
+      'there is no bba-growth-os Worker, because wrangler.toml still reads ' +
+      'REPLACE_WITH_D1_DATABASE_ID and a binding pointing at a placeholder fails the deploy ' +
+      'outright. Exactly the trap Project 4 hit. When it does run, this is the only project ' +
+      'that deliberately SPENDS to make the others earn: ads on five platforms, organic posting ' +
+      'to nine, and Stripe revenue joined back to ad spend so the number driving decisions is ' +
+      'return on ad spend rather than clicks. Its revenue model is "none" because it earns ' +
+      'nothing itself — its cost is the point, and the thing to watch is whether that cost ' +
+      'turns into revenue somewhere else in this portfolio.',
     gates: [
-      'Deploy it — the D1 id in wrangler.toml is still a placeholder',
+      'Paste the real D1 id into wrangler.toml — the database is already there and migrated',
+      'Deploy the Worker, and confirm its cron triggers registered',
       'Connect at least one ad platform and one social platform for real',
       'Prove the approval gate holds: nothing spends or publishes without a human',
       'Get one campaign to a measurable ROAS, positive or negative — either is information',
