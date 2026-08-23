@@ -118,8 +118,16 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          # Without pipefail the exit status of `cmd | tee` is tee's, so a
+          # failed deploy reports success and the run goes green with nothing
+          # deployed. That happened on the first real run of this workflow.
+          set -o pipefail
           npm run cf:deploy 2>&1 | tee deploy.log
-          URL=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          URL=$(grep -oiE 'https://[a-z0-9._-]+\.workers\.dev' deploy.log | head -1)
+          if [ -z "$URL" ]; then
+            echo "Deploy finished but printed no workers.dev URL."
+            echo "Find it at Cloudflare -> Workers & Pages -> bba-heartbeat."
+          fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: What to do next
@@ -132,12 +140,17 @@ jobs:
             if [ -n "$URL" ]; then
               echo "### It is live"
               echo ""
-              echo "**$URL**"
+              echo "# $URL"
               echo ""
               echo "Open it. Most things will say \"not connected\" until you finish below."
             else
-              echo "Storage is set up. Deploy did not run or did not report a URL —"
-              echo "check the log above."
+              echo "### The deploy did not finish"
+              echo ""
+              echo "The database, cache and bucket were created and the tables are in place —"
+              echo "that part worked and does not need redoing. Only the deploy failed."
+              echo ""
+              echo "Open the **Deploy** step above and read the last few lines; it names what"
+              echo "went wrong. Fix it, then re-run this workflow."
             fi
             echo ""
             echo "### Three things left, all in a browser"
