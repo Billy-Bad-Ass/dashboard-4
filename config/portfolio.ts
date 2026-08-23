@@ -94,7 +94,7 @@ export const PROJECTS: Project[] = [
     gates: [
       'Hold an approved affiliate account (Amazon Associates, CJ, or similar)',
       'Set monetisationEnabled = true in config/site.config.ts',
-      'Point a real domain at it — a github.io subpath will not rank',
+      'Give it its own domain — NOT a bbanetwork.org subdomain (see docs/DOMAINS.md)',
       'Submit the sitemap and get pages indexed',
     ],
     vitals: [
@@ -153,6 +153,8 @@ export const PROJECTS: Project[] = [
       'Push the catalogue to live-mode Stripe (npm run stripe:sync -- --apply)',
       'Upload the PDFs to the production R2 bucket',
       'Take one real payment end to end and confirm the download lands',
+      'Point bbanetwork.org at it — a workers.dev URL does not read as a shop',
+      'Fix supportEmail: it says support@bba.network, a domain you do not own',
       'Put the storefront in front of an audience that is not you',
     ],
     vitals: [
@@ -240,16 +242,17 @@ export const PROJECTS: Project[] = [
     revenueModel: 'none',
     accent: '#7C5CE6',
     icon: 'heart-pulse',
+    liveUrl: 'https://bba-heartbeat.bbacentralworkspace.workers.dev',
     startedOn: '2026-08-23',
     reality:
-      'Internal tooling — it will never earn a penny directly, and it costs real money to run. ' +
-      'It earns its keep by making the other projects’ numbers impossible to avoid looking at. ' +
-      'It is listed here so its own running cost stays inside the portfolio ROI rather than ' +
-      'hiding outside it.',
+      'Deployed and ticking. Internal tooling — it will never earn a penny directly, and it ' +
+      'costs real money to run. It earns its keep by making the other projects’ numbers ' +
+      'impossible to avoid looking at, and it is listed here so its own running cost stays ' +
+      'inside the portfolio ROI rather than hiding outside it.',
     gates: [
-      'Create the D1 database and KV namespace, fill the ids into wrangler.jsonc',
-      'Set the Stripe, GitHub and calendar secrets',
-      'Deploy to Workers and confirm the cron heartbeat is ticking',
+      'Put Cloudflare Access in front of it — until then the URL is the only thing protecting it',
+      'Add the connector secrets so the tiles show measured numbers rather than dashes',
+      'Move it to heartbeat.bbanetwork.org and extend Access to the new hostname',
     ],
     vitals: [
       {

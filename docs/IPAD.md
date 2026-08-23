@@ -196,7 +196,26 @@ GitHub → **Actions** → **Deploy** → **Run workflow** → **Run workflow**.
 Two minutes. Then open `/setup` on your dashboard — the connectors you added
 should be green.
 
-### 9. Let the agents report in
+### 9. Put it on your own domain
+
+You own `bbanetwork.org`, so the dashboard does not have to live at a
+`workers.dev` address.
+
+1. Cloudflare → **Workers & Pages** → **bba-heartbeat**
+2. **Settings** → **Domains & Routes** → **Add** → **Custom domain**
+3. Enter `heartbeat.bbanetwork.org`
+4. **Add domain**
+
+Cloudflare creates the DNS record and the certificate itself. A minute or two.
+
+> ⚠️ **Then go back to Access.** An Access policy protects a *hostname*, not a
+> Worker. The new address is an unprotected door to the same dashboard until you
+> add it: Zero Trust → Access → Applications → your app → add the hostname.
+
+Full plan for the domain — including which project should **not** go on it, and
+a live bug in Project 2's support address — is in [DOMAINS.md](DOMAINS.md).
+
+### 10. Let the agents report in
 
 So their runs show on the Agents page.
 
