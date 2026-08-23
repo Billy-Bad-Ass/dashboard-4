@@ -19,7 +19,7 @@ import {
   STATUS_META,
   type ClientWithDeals,
 } from '@/lib/crm';
-import { parseMoney } from '@/lib/money';
+import { parseMoney, symbolFor, DEFAULT_CURRENCY } from '@/lib/money';
 import { isoDate } from '@/lib/dates';
 import { Icon } from './Icon';
 
@@ -250,7 +250,7 @@ export function ClientDetail({ client }: { client: ClientWithDeals }) {
         </div>
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10 }}>
           <Field id="dl-title" label="Title" name="title" placeholder="Website rebuild" required />
-          <Field id="dl-value" label="Value (£)" name="value" placeholder="1200" required />
+          <Field id="dl-value" label={`Value (${symbolFor(DEFAULT_CURRENCY)})`} name="value" placeholder="1200" required />
           <div className="field">
             <label htmlFor="dl-stage">Stage</label>
             <select id="dl-stage" name="stage" defaultValue="lead">

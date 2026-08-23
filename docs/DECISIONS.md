@@ -17,10 +17,10 @@ uncomfortable one is true.
 **Cost.** Every metric path carries a nullable, and `resolveVitals` has an
 explicit case per key rather than a lookup table.
 
-## Money is integer pence
+## Money is integer minor units
 
 **Decision.** Every amount, in D1 and in TypeScript, is an integer of minor
-units. `500` is £5.00.
+units. `500` is $5.00.
 
 **Why.** Matches Project-2, so moving between repos does not mean switching
 convention. Floats in SQLite store 5.00 as 4.999999. And the failure mode of
@@ -31,7 +31,7 @@ getting it wrong is a 100x error on a number you then make decisions from.
 
 ## Recurring spend is expanded, not duplicated
 
-**Decision.** A `£5/month` row is one row with `recurrence: 'monthly'`, expanded
+**Decision.** A `$5/month` row is one row with `recurrence: 'monthly'`, expanded
 into occurrences at read time. Cancelling sets `ended_on`.
 
 **Why.** Storing twelve rows a year would work, but then cancelling means

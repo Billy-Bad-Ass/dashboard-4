@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         ? parseMoney(body.amount)
         : null;
   if (amount === null || amount === 0) {
-    return badRequest('Provide amount_pence (integer pence) or amount ("12.50").');
+    return badRequest('Provide amount_pence (integer minor units) or amount ("12.50").');
   }
 
   try {

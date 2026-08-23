@@ -29,7 +29,7 @@ and every vital honours it:
 
 | Shown | Means |
 | --- | --- |
-| `£0.00` | Measured. Genuinely zero. |
+| `$0.00` | Measured. Genuinely zero. |
 | `—` | Nothing has reported this. Connector unconfigured, or metric never captured. |
 | ROI `—` | Nothing has been spent, so the ratio is undefined — not zero. |
 | ROI `-100%` | Money went out, none came back. A real and useful number. |
@@ -72,7 +72,7 @@ already paid for — the $5/month Workers plan and, for the agents, a Claude Max
 subscription via `CLAUDE_CODE_OAUTH_TOKEN`.
 
 The `/ask` page is the exception: it is a deployed web app calling the Claude
-API, which is billed separately from any Claude subscription. Roughly £0.09 a
+API, which is billed separately from any Claude subscription. Roughly $0.09 a
 question on the default model, or about a fifth of that with `ASK_MODEL` set to
 `claude-haiku-4-5`. Leave `ANTHROPIC_API_KEY` unset and everything else still
 works.
@@ -83,7 +83,7 @@ works.
 | --- | --- |
 | `config/portfolio.ts` | **The register.** The one file you edit when a project is added, renamed or changes what it is trying to earn. Drives the nav, the routes, the pollers and the ROI maths. |
 | `config/agents.ts` | The agent fleet, and which repository each agent actually runs from. |
-| `db/migrations/` | D1 schema. Money is integer pence everywhere. |
+| `db/migrations/` | D1 schema. Money is integer minor units everywhere. |
 | `lib/heartbeat.ts` | `pulse()` — assembles the entire dashboard state. Never throws. |
 | `lib/finance.ts` | Recurring-spend expansion, overhead apportionment, ROI. |
 | `lib/crm.ts` | Clients, deals, interactions. Prospects and clients share one table. |
@@ -99,8 +99,8 @@ works.
 | --- | --- |
 | `/` | Is anything alive, and is anything wrong? |
 | `/ask` | Anything, in plain English — it queries the real data and shows what it looked up. |
-| `/projects/[slug]` | For this project: what does it earn, what has it cost, and what is genuinely blocking its first pound? |
-| `/finance` | Where every pound went, and what each project has to show for it. |
+| `/projects/[slug]` | For this project: what does it earn, what has it cost, and what is genuinely blocking its first dollar? |
+| `/finance` | Where every dollar went, and what each project has to show for it. |
 | `/clients` | Who is a client, who might become one, and who is going cold. |
 | `/agents` | What runs automatically, and what it actually did. |
 | `/calendar` | What is booked, and what the machines will do without being asked. |
@@ -127,7 +127,7 @@ Four projects, registered in `config/portfolio.ts`:
 
 ## Rules that are load-bearing
 
-- **Money is integer pence, everywhere.** `500` is £5.00. One formatter, and it
+- **Money is integer minor units, everywhere.** `500` is $5.00. One formatter, and it
   takes pence. Getting this wrong by 100x is the classic failure here, and the
   convention matches Project-2 deliberately.
 - **Never invent a number.** A connector that is unconfigured reports unknown,

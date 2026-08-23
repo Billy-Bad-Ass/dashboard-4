@@ -4,8 +4,8 @@
  * Every ROI, burn and runway figure on the dashboard comes from here, so the
  * arguable decisions are written down rather than scattered through components:
  *
- *  - **Recurring spend is expanded, not multiplied.** A £5/month row that
- *    started in August contributes one £5 occurrence per elapsed month, ending
+ *  - **Recurring spend is expanded, not multiplied.** A $5/month row that
+ *    started in August contributes one $5 occurrence per elapsed month, ending
  *    when `ended_on` says it did. Storing twelve rows a year would work too,
  *    but then cancelling something means editing history.
  *
@@ -136,7 +136,7 @@ export interface ProjectFinance extends Totals {
   directSpendPence: Pence;
   /** This project's share of portfolio-wide overhead. */
   overheadPence: Pence;
-  /** Days from project start to its first pound of net revenue. Null if none. */
+  /** Days from project start to its first dollar of net revenue. Null if none. */
   daysToFirstRevenue: number | null;
 }
 

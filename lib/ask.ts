@@ -128,8 +128,10 @@ preamble, no "Great question", no restating what was asked.
 
 # Rules that are not negotiable
 
-**Money is stored in integer pence. Always convert for display.** \`500\` is £5.00,
-\`1400\` is £14.00. Divide by 100 and write it with a £ and two decimals. Reporting
+**Money is stored in integer minor units. Always convert for display.** \`500\` is $5.00,
+\`1400\` is $14.00. Divide by 100 and write it with a $ and two decimals, unless a
+tool result names a different currency for that row — Stripe reports the currency of
+each charge and you must use the one it gives you. Reporting
 a pence value as pounds is a 100x error, and it is the single easiest way to
 give catastrophically wrong advice here.
 
@@ -161,7 +163,7 @@ const TOOLS: Anthropic.Tool[] = [
       'The whole current dashboard state in one call: per-project health and vitals, ' +
       'connector status, finance totals, pipeline summary, recent agent runs and upcoming ' +
       'calendar events. Start here for any broad question ("how are we doing", "what is wrong"). ' +
-      'All money fields are integer pence.',
+      'All money fields are integer minor units.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
     strict: true,
   },
@@ -171,7 +173,7 @@ const TOOLS: Anthropic.Tool[] = [
       'Authoritative money totals: spend, revenue, ROI and burn, per project and for the ' +
       'portfolio. Use this rather than summing the spend table yourself — it expands recurring ' +
       'subscriptions into their actual occurrences and apportions portfolio overhead, which raw ' +
-      'SQL over `spend` does not. All amounts are integer pence.',
+      'SQL over `spend` does not. All amounts are integer minor units.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
     strict: true,
   },
@@ -180,7 +182,7 @@ const TOOLS: Anthropic.Tool[] = [
     description:
       'Run one read-only SELECT against the dashboard database for anything the other tools ' +
       'do not cover — filtering, grouping, counting, date ranges. SELECT only; a LIMIT is ' +
-      'applied automatically. Money columns come back as integer pence.',
+      'applied automatically. Money columns come back as integer minor units.',
     input_schema: {
       type: 'object',
       properties: {
@@ -267,7 +269,7 @@ async function runTool(name: string, input: Record<string, unknown>): Promise<st
     case 'get_finance': {
       const snapshot = await pulse();
       return JSON.stringify({
-        note: 'All amounts are integer pence. Divide by 100 for pounds.',
+        note: 'All amounts are integer minor units. Divide by 100 for pounds.',
         ...snapshot.finance,
       });
     }
@@ -282,7 +284,7 @@ async function runTool(name: string, input: Record<string, unknown>): Promise<st
           note:
             rows.length === 0
               ? 'No rows. That means the query matched nothing — it does not mean zero.'
-              : 'Money columns are integer pence.',
+              : 'Money columns are integer minor units.',
           rows,
         });
       } catch (error) {

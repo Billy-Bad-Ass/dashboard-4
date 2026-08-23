@@ -36,7 +36,7 @@ export default async function SetupPage() {
     {
       name: 'CLOUDFLARE_API_TOKEN',
       set: Boolean(env?.CLOUDFLARE_API_TOKEN ?? process.env.CLOUDFLARE_API_TOKEN),
-      what: 'Worker traffic — what the £5/month is actually buying.',
+      what: 'Worker traffic — what the $5/month is actually buying.',
       how: 'Cloudflare → your icon → API Tokens → Create Token → custom → Account Analytics: Read.',
     },
     {
@@ -172,7 +172,7 @@ export default async function SetupPage() {
           <div className="tiny faint" style={{ marginTop: 12 }}>
             Everything here except <span className="mono">ANTHROPIC_API_KEY</span> is covered by
             the Cloudflare plan already being paid for. The Ask page calls the Claude API, which
-            is billed separately from a Claude subscription — roughly £0.09 a question, or a fifth
+            is billed separately from a Claude subscription — roughly $0.09 a question, or a fifth
             of that with an <span className="mono">ASK_MODEL</span> variable set to{' '}
             <span className="mono">claude-haiku-4-5</span>.
           </div>

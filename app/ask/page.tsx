@@ -35,7 +35,7 @@ export default function AskPage() {
               <br />
               This is the one part of the dashboard that costs money per use: the Claude API is
               billed separately from a Pro or Max subscription, which covers the Claude app rather
-              than the API. Roughly £0.09 a question, or a fifth of that with an{' '}
+              than the API. Roughly $0.09 a question, or a fifth of that with an{' '}
               <span className="mono">ASK_MODEL</span> variable set to{' '}
               <span className="mono">claude-haiku-4-5</span>.
             </div>

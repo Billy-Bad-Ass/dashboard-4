@@ -13,9 +13,9 @@ Worth knowing before you start, because one of these is not what people expect.
 
 | Thing | Cost |
 | --- | --- |
-| Cloudflare Workers, D1, KV, R2, cron | **£0 extra** — the $5/month plan you already pay covers all of it |
-| GitHub Actions | **£0** — public repositories get unlimited minutes |
-| The scheduled agents | **£0** — they can run on your Claude Max plan, see below |
+| Cloudflare Workers, D1, KV, R2, cron | **$0 extra** — the $5/month plan you already pay covers all of it |
+| GitHub Actions | **$0** — public repositories get unlimited minutes |
+| The scheduled agents | **$0** — they can run on your Claude Max plan, see below |
 | The Ask page (`/ask`) | **Not free.** Needs Claude API credits, billed separately from Max |
 
 ### Max does not include API credits
@@ -41,8 +41,8 @@ A question involves the reasoning, a lookup or two, and a short answer.
 
 | Model | Roughly per question | 10 questions a day |
 | --- | --- | --- |
-| `claude-opus-5` (default) | ~£0.09 | ~£27/month |
-| `claude-haiku-4-5` | ~£0.02 | ~£6/month |
+| `claude-opus-5` (default) | ~$0.09 | ~$27/month |
+| `claude-haiku-4-5` | ~$0.02 | ~$6/month |
 
 To switch: Cloudflare → Workers & Pages → `bba-heartbeat` → Settings → Variables
 and Secrets → add a **plain variable** (not a secret) called `ASK_MODEL` with the
@@ -277,7 +277,7 @@ Everything on this dashboard distinguishes **"nothing reported this"** from
 **"we measured it and it is zero"**.
 
 - `—` means unknown. A connector is not set up.
-- `£0.00` means measured, and genuinely zero.
+- `$0.00` means measured, and genuinely zero.
 
 You are pre-revenue, so a lot of real zeroes are correct. Do not read them as
 broken — and do not read a `—` as a zero.

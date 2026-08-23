@@ -8,33 +8,38 @@ import {
   formatPercent,
 } from '../lib/money.ts';
 
-test('formatMoney renders pence as pounds with two decimals', () => {
-  assert.equal(formatMoney(500), '£5.00');
-  assert.equal(formatMoney(1400), '£14.00');
-  assert.equal(formatMoney(0), '£0.00');
-  assert.equal(formatMoney(1), '£0.01');
-  assert.equal(formatMoney(-250), '-£2.50');
+test('formatMoney renders minor units as major with two decimals', () => {
+  // USD is the default: the storefront prices in dollars and Cloudflare bills
+  // in dollars, so that is what the business transacts in.
+  assert.equal(formatMoney(500), '$5.00');
+  assert.equal(formatMoney(1400), '$14.00');
+  assert.equal(formatMoney(0), '$0.00');
+  assert.equal(formatMoney(1), '$0.01');
+  assert.equal(formatMoney(-250), '-$2.50');
 });
 
-test('formatMoney honours other currencies', () => {
-  assert.equal(formatMoney(500, 'usd'), '$5.00');
+test('formatMoney honours an explicit currency', () => {
+  // Stripe reports the currency of each charge. A GBP charge must not render
+  // with a dollar sign just because the default changed.
+  assert.equal(formatMoney(500, 'gbp'), '£5.00');
   assert.equal(formatMoney(500, 'eur'), '€5.00');
   // An unknown currency falls back to its code rather than a wrong symbol.
   assert.equal(formatMoney(500, 'jpy'), 'JPY 5.00');
 });
 
 test('formatMoneyCompact keeps small amounts exact', () => {
-  // Below £1000 every pound is worth seeing in full at this stage.
-  assert.equal(formatMoneyCompact(500), '£5.00');
-  assert.equal(formatMoneyCompact(99_999), '£999.99');
-  assert.equal(formatMoneyCompact(150_000), '£1.5k');
-  assert.equal(formatMoneyCompact(1_200_000), '£12k');
-  assert.equal(formatMoneyCompact(500_000_000), '£5m');
+  // Below $1000 every dollar is worth seeing in full at this stage.
+  assert.equal(formatMoneyCompact(500), '$5.00');
+  assert.equal(formatMoneyCompact(99_999), '$999.99');
+  assert.equal(formatMoneyCompact(150_000), '$1.5k');
+  assert.equal(formatMoneyCompact(1_200_000), '$12k');
+  assert.equal(formatMoneyCompact(500_000_000), '$5m');
 });
 
 test('parseMoney handles the ways a human types an amount', () => {
   assert.equal(parseMoney('5'), 500);
   assert.equal(parseMoney('5.00'), 500);
+  assert.equal(parseMoney('$12.50'), 1250);
   assert.equal(parseMoney('£12.50'), 1250);
   assert.equal(parseMoney('1,200'), 120_000);
   assert.equal(parseMoney(' 7.99 '), 799);

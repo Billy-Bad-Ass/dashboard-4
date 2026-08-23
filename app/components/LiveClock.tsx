@@ -7,7 +7,7 @@
  * `router.refresh()` re-runs the server components and streams new HTML in
  * without a full navigation, so the poll costs one request and no client-side
  * data layer. It pauses while the tab is hidden — a background tab refreshing
- * every 60 seconds burns Worker requests out of the same £5 plan the dashboard
+ * every 60 seconds burns Worker requests out of the same $5 plan the dashboard
  * is meant to be reporting on.
  */
 

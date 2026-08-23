@@ -14,7 +14,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PROJECTS } from '@/config/portfolio';
-import { parseMoney, formatMoney } from '@/lib/money';
+import { parseMoney, formatMoney, symbolFor, DEFAULT_CURRENCY } from '@/lib/money';
 import { isoDate } from '@/lib/dates';
 import { Icon } from './Icon';
 
@@ -91,7 +91,7 @@ export function SpendForm({ defaultProject }: { defaultProject?: string }) {
     <form onSubmit={submit} className="stack" style={{ gap: 10 }}>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10 }}>
         <div className="field">
-          <label htmlFor="spend-amount">Amount (£)</label>
+          <label htmlFor="spend-amount">Amount ({symbolFor(DEFAULT_CURRENCY)})</label>
           <input
             id="spend-amount"
             name="amount"
