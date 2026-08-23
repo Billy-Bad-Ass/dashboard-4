@@ -40,7 +40,7 @@
       "binding": "DB",
       "database_name": "bba-heartbeat",
       // Replace with the id printed by `wrangler d1 create bba-heartbeat`.
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "a57d42d4-701d-4a24-8143-3271c0d4de86",
       "migrations_dir": "db/migrations"
     }
   ],
@@ -49,7 +49,7 @@
     {
       "binding": "CACHE",
       // Replace with the id printed by `wrangler kv namespace create CACHE`.
-      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
+      "id": "2810c7dcd0ac438aaa641f5aacee5058"
     }
   ],
 
