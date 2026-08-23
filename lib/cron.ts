@@ -17,7 +17,7 @@
  * milliseconds.
  */
 
-import { PROJECTS } from '@/config/portfolio';
+import { projectForCharge } from '@/config/portfolio';
 import { pulse, recordHeartbeat, recordMetric } from './heartbeat';
 import { execute, query, queryOne } from './db';
 import { isoStamp, isoDate, addDays } from './dates';
@@ -142,11 +142,23 @@ async function reconcileStripe(snapshot: Awaited<ReturnType<typeof pulse>>): Pro
   const charges = snapshot.stripe?.charges ?? [];
   if (charges.length === 0) return 'no charges to reconcile';
 
-  const target = PROJECTS.find((p) => p.revenueModel === 'stripe');
-  if (!target) return 'no project uses Stripe';
-
   let written = 0;
+  const unattributed: string[] = [];
+
   for (const charge of charges) {
+    const project = projectForCharge({
+      statementDescriptor: charge.statementDescriptor,
+      description: charge.description,
+    });
+
+    // No guess. A charge whose business cannot be identified is logged and left
+    // out rather than improving some project's ROI by accident — the number
+    // would be wrong permanently and nothing would ever flag it.
+    if (!project) {
+      unattributed.push(charge.id);
+      continue;
+    }
+
     await execute(
       `INSERT INTO revenue (project_slug, received_on, gross_pence, fees_pence, refunded_pence, currency, source, external_id, description)
        VALUES (?,?,?,?,?,?,'stripe',?,?)
@@ -154,9 +166,10 @@ async function reconcileStripe(snapshot: Awaited<ReturnType<typeof pulse>>): Pro
          gross_pence = excluded.gross_pence,
          fees_pence = excluded.fees_pence,
          refunded_pence = excluded.refunded_pence,
-         received_on = excluded.received_on`,
+         received_on = excluded.received_on,
+         project_slug = excluded.project_slug`,
       [
-        target.slug,
+        project.slug,
         charge.createdOn,
         charge.amountPence,
         charge.feePence,
@@ -168,7 +181,27 @@ async function reconcileStripe(snapshot: Awaited<ReturnType<typeof pulse>>): Pro
     );
     written += 1;
   }
-  return `${written} charges reconciled into ${target.slug}`;
+
+  if (unattributed.length > 0) {
+    // Surfaced as a failed connector check so it reaches the overview rather
+    // than dying in a log nobody reads.
+    await execute(
+      'INSERT INTO heartbeats (connector, status, latency_ms, detail, checked_at) VALUES (?,?,?,?,?)',
+      [
+        'stripe',
+        'degraded',
+        0,
+        `${unattributed.length} charge(s) matched no project — add a stripeMatch in ` +
+          `config/portfolio.ts: ${unattributed.slice(0, 5).join(', ')}`,
+        isoStamp(),
+      ],
+    );
+  }
+
+  return (
+    `${written} charge(s) attributed` +
+    (unattributed.length ? `, ${unattributed.length} UNATTRIBUTED` : '')
+  );
 }
 
 /**
