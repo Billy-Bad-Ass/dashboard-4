@@ -18,7 +18,11 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "bba-heartbeat",
-  "main": ".open-next/worker.js",
+
+  // Points at the wrapper, NOT at .open-next/worker.js. The generated worker
+  // has no `scheduled` handler, so with `main` aimed straight at it the cron
+  // triggers below fire into nothing. See worker/index.ts.
+  "main": "worker/index.ts",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 
