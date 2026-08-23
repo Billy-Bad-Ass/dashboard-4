@@ -1,0 +1,70 @@
+name: Agent · Spend audit
+
+# Monthly reconciliation of the ledger against what is actually being paid for.
+# Runs on the 1st, after the previous month has closed.
+on:
+  schedule:
+    - cron: '0 9 1 * *'
+  workflow_dispatch:
+
+concurrency:
+  group: agent-spend-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - id: start
+        run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Audit the ledger
+        id: audit
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            /spend-audit
+
+            Open a GitHub issue titled "Spend audit — <month>" labelled `finance` listing
+            every discrepancy, ranked by which direction it biases ROI — most-flattering
+            first. A cost being paid but not recorded is worse than one recorded twice,
+            because it makes the business look cheaper to run than it is.
+
+            Include the exact command to fix each one. Do not fix any of them: the ledger
+            is a financial record and a human confirms every change.
+
+            If the ledger reconciles cleanly, open no issue.
+          claude_args: |
+            --allowed-tools Read,Write,Bash,Grep,Glob,WebFetch,Agent
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+
+      - name: Report the outcome
+        if: always()
+        run: |
+          STATUS=ok
+          [ "${{ steps.audit.outcome }}" = "failure" ] && STATUS=failed
+          curl -sf -X POST "$DASHBOARD_URL/api/agent-runs" \
+            -H "Authorization: Bearer $DASHBOARD_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d "{\"agent\":\"spend-auditor\",\"trigger\":\"cron\",\"status\":\"$STATUS\",
+                 \"started_at\":\"${{ steps.start.outputs.started }}\",
+                 \"summary\":\"Monthly spend audit.\",
+                 \"artifact_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}

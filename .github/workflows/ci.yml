@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Workflow scripts are valid
+        run: npm run workflows:check
+
+      - name: Icons are up to date
+        # The vendored icon module is generated. If someone edits it by hand the
+        # next regeneration silently reverts them, so CI catches the drift.
+        run: |
+          git diff --exit-code --stat lib/icons.generated.ts \
+            || { echo "lib/icons.generated.ts has uncommitted changes"; exit 1; }
+
+      - name: Build
+        run: npm run build
+
+      - name: No secrets committed
+        # Cheap belt-and-braces: the real protection is .gitignore and
+        # `wrangler secret put`, but a pasted key should never reach a branch.
+        run: |
+          if git grep -nE '(sk_live_|rk_live_|whsec_|ghp_|github_pat_)' -- . ':!*.yml' ':!docs/*'; then
+            echo "Possible secret committed — see matches above."
+            exit 1
+          fi

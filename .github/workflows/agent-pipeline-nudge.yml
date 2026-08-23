@@ -1,0 +1,67 @@
+name: Agent · Pipeline nudge
+
+# Weekday check on the client pipeline: actions due, relationships going cold.
+# 08:00 UTC so it lands before the working day rather than during it.
+on:
+  schedule:
+    - cron: '0 8 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: agent-pipeline-nudge
+  cancel-in-progress: true
+
+jobs:
+  nudge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - id: start
+        run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Check the pipeline
+        id: nudge
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            Use the `pipeline-nudge` subagent.
+
+            Open one issue labelled `pipeline` ONLY if there is something to act on.
+            An empty issue every weekday trains everyone to ignore the label, which
+            costs more than the occasional missed follow-up.
+
+            Never contact anybody and never edit a client record — propose, with the
+            API call, and stop.
+          claude_args: |
+            --allowed-tools Read,Write,Bash,Grep,Glob,WebFetch,Agent
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+
+      - name: Report the outcome
+        if: always()
+        run: |
+          STATUS=ok
+          [ "${{ steps.nudge.outcome }}" = "failure" ] && STATUS=failed
+          curl -sf -X POST "$DASHBOARD_URL/api/agent-runs" \
+            -H "Authorization: Bearer $DASHBOARD_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d "{\"agent\":\"pipeline-nudge\",\"trigger\":\"cron\",\"status\":\"$STATUS\",
+                 \"started_at\":\"${{ steps.start.outputs.started }}\",
+                 \"summary\":\"Weekday pipeline check.\",
+                 \"artifact_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}

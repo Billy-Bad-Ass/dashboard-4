@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(npm run dev)",
+      "Bash(npm test)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run check)",
+      "Bash(npm run icons:build)",
+      "Bash(npm run workflows:check)",
+      "Bash(node scripts/*.mjs)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git grep:*)",
+      "Read(//home/user/Project-4/**)",
+      "Edit(//home/user/Project-4/app/**)",
+      "Edit(//home/user/Project-4/lib/**)",
+      "Edit(//home/user/Project-4/config/**)",
+      "Edit(//home/user/Project-4/docs/**)",
+      "WebSearch",
+      "WebFetch",
+      "mcp__stripe__stripe_api_read",
+      "mcp__stripe__stripe_api_search",
+      "mcp__stripe__stripe_analytics",
+      "mcp__stripe__search_stripe_documentation"
+    ],
+    "deny": [
+      "Read(//home/user/Project-4/.env)",
+      "Read(//home/user/Project-4/.env.local)",
+      "Read(//home/user/Project-4/.dev.vars)",
+      "Bash(curl:*)",
+      "Bash(rm -rf:*)",
+      "Bash(wrangler secret:*)",
+      "Bash(npm run cf:deploy)",
+      "Bash(npm run db:migrate:remote)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "mcp__stripe__stripe_api_write",
+      "mcp__stripe__create_refund"
+    ]
+  }
+}

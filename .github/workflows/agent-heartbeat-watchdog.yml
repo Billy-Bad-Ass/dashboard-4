@@ -1,0 +1,66 @@
+name: Agent · Heartbeat watchdog
+
+# The one check nothing else would catch: if the Worker cron stops, the
+# dashboard keeps serving its last known numbers and looks perfectly healthy
+# while being arbitrarily stale.
+on:
+  schedule:
+    - cron: '30 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: agent-heartbeat-watchdog
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Probe the pulse endpoint
+        id: probe
+        # A plain curl first, so a dead Worker is distinguished from a Worker
+        # that answers with bad data. Only the second case needs an agent.
+        run: |
+          if ! BODY=$(curl -sf --max-time 20 "$DASHBOARD_URL/api/pulse"); then
+            echo "reachable=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "reachable=true" >> "$GITHUB_OUTPUT"
+          MINUTES=$(echo "$BODY" | jq -r '.lastCronMinutes // "null"')
+          echo "minutes=$MINUTES" >> "$GITHUB_OUTPUT"
+          echo "Last cron: $MINUTES minutes ago"
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+
+      - name: Investigate and report
+        # Only spend an agent run when something is actually wrong. A healthy
+        # watchdog does nothing at all, four times a day.
+        if: >-
+          steps.probe.outputs.reachable == 'false' ||
+          steps.probe.outputs.minutes == 'null' ||
+          fromJSON(steps.probe.outputs.minutes || '0') > 30
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            Use the `heartbeat-watchdog` subagent.
+
+            The probe found: reachable=${{ steps.probe.outputs.reachable }},
+            lastCronMinutes=${{ steps.probe.outputs.minutes }}.
+
+            Search for an existing OPEN issue labelled `ops` about a stale heartbeat
+            first. If one exists, comment on it with the current reading instead of
+            opening a second — this job runs four times a day and duplicate issues
+            would bury everything else.
+          claude_args: |
+            --allowed-tools Read,Bash,Grep,Glob,WebFetch,Agent
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}

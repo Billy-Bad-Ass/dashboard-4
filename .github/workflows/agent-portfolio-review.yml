@@ -1,0 +1,102 @@
+name: Agent · Portfolio review
+
+# Reads the live dashboard, verifies every finding, and opens one issue with a
+# single recommendation. Monday morning, before the project agents run, so the
+# week starts with a portfolio-level read rather than four project-level ones.
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+    inputs:
+      period:
+        description: 'Period to review'
+        required: false
+        default: 'last 7 days'
+
+concurrency:
+  group: agent-portfolio-review
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Tell the dashboard a run started
+        id: start
+        # `|| true` throughout the reporting steps: the dashboard being down
+        # must not fail the agent run. Losing the log entry is a smaller problem
+        # than losing the review.
+        run: |
+          echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          curl -sf -X POST "$DASHBOARD_URL/api/agent-runs" \
+            -H "Authorization: Bearer $DASHBOARD_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"agent":"portfolio-analyst","trigger":"cron","status":"running",
+                 "summary":"Weekly portfolio review started."}' || true
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+
+      - name: Produce the review
+        id: review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            /portfolio-review ${{ inputs.period || 'last 7 days' }}
+
+            Then open a GitHub issue titled "Portfolio review — <the period>" whose body
+            is the report, labelled `review`.
+
+            Put anything that is going wrong at the top of the body and name it in the
+            title. That is the reason this job exists — a review that leads with a
+            headline number and buries a stalled project is worse than no review.
+
+            If genuinely nothing changed since the last report in docs/reports/, open no
+            issue: commit the report and log one line saying nothing moved.
+          claude_args: |
+            --allowed-tools Read,Write,Bash,Grep,Glob,WebFetch,Agent,Workflow
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+
+      - name: Report the outcome
+        if: always()
+        run: |
+          STATUS=ok
+          [ "${{ steps.review.outcome }}" = "failure" ] && STATUS=failed
+          curl -sf -X POST "$DASHBOARD_URL/api/agent-runs" \
+            -H "Authorization: Bearer $DASHBOARD_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d "{\"agent\":\"portfolio-analyst\",\"trigger\":\"cron\",\"status\":\"$STATUS\",
+                 \"started_at\":\"${{ steps.start.outputs.started }}\",
+                 \"summary\":\"Weekly portfolio review.\",
+                 \"artifact_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+
+      - name: Commit the report
+        if: success()
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          if [ -n "$(git status --porcelain docs/reports)" ]; then
+            git add docs/reports
+            git commit -m 'chore(reports): weekly portfolio review'
+            git push
+          fi

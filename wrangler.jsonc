@@ -1,0 +1,79 @@
+/**
+ * Cloudflare Workers configuration for the BBA Network heartbeat dashboard.
+ *
+ * Everything here is sized for the $5/month Workers Paid plan, which is what
+ * makes this dashboard possible at all:
+ *
+ *  - D1        — the whole business database (projects, spend, clients, deals,
+ *                agent runs, metric history). 5 GB included; this uses megabytes.
+ *  - KV        — the hot cache in front of Stripe/GitHub/Calendar so a page load
+ *                never waits on three third-party APIs.
+ *  - Cron      — the heartbeat itself. Free plan caps you at a handful of
+ *                triggers; Paid is what lets this poll every 10 minutes.
+ *  - R2        — exports and report archives. Egress is free, which is the
+ *                entire reason to use it over S3.
+ *
+ * Secrets are NOT set here. Use `wrangler secret put <NAME>` — see docs/RUNBOOK.md.
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bba-heartbeat",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  // Without this, `wrangler deploy` silently wipes plain-text vars that were
+  // added in the Cloudflare dashboard but are absent from this file.
+  "keep_vars": true,
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bba-heartbeat",
+      // Replace with the id printed by `wrangler d1 create bba-heartbeat`.
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "db/migrations"
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      // Replace with the id printed by `wrangler kv namespace create CACHE`.
+      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "ARCHIVE",
+      "bucket_name": "bba-heartbeat-archive"
+    }
+  ],
+
+  // The heartbeat. Each tick fans out to the pollers in lib/heartbeat.ts.
+  // Off-the-hour on purpose: cron jobs at :00 queue behind everyone else's.
+  "triggers": {
+    "crons": [
+      "*/10 * * * *", // fast pulse — Stripe, GitHub, deploy state
+      "17 * * * *",   // hourly — calendar refresh, metric snapshot
+      "23 6 * * *"    // daily 06:23 UTC — roll up yesterday, prune history
+    ]
+  },
+
+  "vars": {
+    // Public, non-secret values only. Anything sensitive goes in `wrangler secret put`.
+    "NEXT_PUBLIC_SITE_URL": "https://bba-heartbeat.bbacentralworkspace.workers.dev",
+    "GITHUB_OWNER": "Billy-Bad-Ass",
+    "CALENDAR_ACCOUNT": "bbacentralworkspace@gmail.com"
+  }
+}
