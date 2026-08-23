@@ -3,22 +3,28 @@ import Link from 'next/link';
 import { listClients, loadPipeline, STATUS_META } from '@/lib/crm';
 import { pulse } from '@/lib/heartbeat';
 import { formatMoney } from '@/lib/money';
+import { CATEGORICAL, TAIL } from '@/lib/palette';
 import { formatDate, relativeTime } from '@/lib/dates';
 import { PageHead } from '@/app/components/PageHead';
 import { Tile } from '@/app/components/Tile';
 import { Icon } from '@/app/components/Icon';
-import { StackedBar } from '@/app/components/Sparkline';
+import { StackedBar } from '@/app/components/Chart';
 import { ClientBoard } from '@/app/components/ClientBoard';
 
 export const metadata: Metadata = { title: 'Clients' };
 export const dynamic = 'force-dynamic';
 
+/**
+ * Deal stages are ordered, not nominal — lead through won is a progression — so
+ * they take the categorical slots in that order and the two terminal states
+ * take status colours, which is what they actually mean.
+ */
 const STAGE_COLOR: Record<string, string> = {
-  lead: '#8B93A3',
-  qualified: '#2B5CE6',
-  proposal: '#7C5CE6',
-  won: '#12A150',
-  lost: '#B3261E',
+  lead: TAIL,
+  qualified: CATEGORICAL[0],
+  proposal: CATEGORICAL[3],
+  won: 'var(--good)',
+  lost: 'var(--bad)',
 };
 
 export default async function ClientsPage() {

@@ -9,7 +9,7 @@ import { formatDate, relativeTime } from '@/lib/dates';
 import { PageHead } from '@/app/components/PageHead';
 import { Tile } from '@/app/components/Tile';
 import { Icon } from '@/app/components/Icon';
-import { Sparkline } from '@/app/components/Sparkline';
+import { Chart } from '@/app/components/Chart';
 import { HealthBadge, StageBadge, PulseDot, healthColor } from '@/app/components/Badges';
 import { SpendForm } from '@/app/components/SpendForm';
 
@@ -74,10 +74,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
     ),
   ]);
 
-  const byMetric = new Map<string, number[]>();
+  const byMetric = new Map<string, { date: string; value: number }[]>();
   for (const row of history) {
     const list = byMetric.get(row.metric_key) ?? [];
-    list.push(row.value_num);
+    list.push({ date: row.captured_at, value: row.value_num });
     byMetric.set(row.metric_key, list);
   }
 
@@ -269,14 +269,23 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
               <span className="tiny faint">{history.length} snapshots</span>
             </div>
             <div className="grid grid-3">
-              {[...byMetric.entries()].map(([key, values]) => (
-                <div key={key}>
-                  <div className="tiny faint" style={{ marginBottom: 4 }}>
-                    {project.vitals.find((v) => v.key === key)?.label ?? key}
+              {[...byMetric.entries()].map(([key, points]) => {
+                const spec = project.vitals.find((v) => v.key === key);
+                return (
+                  <div key={key}>
+                    <div className="tiny faint" style={{ marginBottom: 4 }}>
+                      {spec?.label ?? key}
+                    </div>
+                    <Chart
+                      points={points}
+                      label={spec?.label ?? key}
+                      color={project.accent}
+                      height={90}
+                      format={(v) => formatVital(v, spec?.unit)}
+                    />
                   </div>
-                  <Sparkline values={values} color={project.accent} height={38} />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ) : null}
@@ -403,6 +412,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   );
 }
 
+/** Shared by the vital tiles and the history charts so they cannot disagree. */
+function formatVital(value: number, unit: VitalSpec['unit'] | undefined): string {
+  if (unit === 'gbp') return formatMoney(value);
+  if (unit === 'percent') return `${value.toFixed(1)}%`;
+  if (unit === 'days') return `${Math.round(value)}d`;
+  return Math.round(value).toLocaleString('en-GB');
+}
+
 function VitalTile({
   spec,
   value,
@@ -412,16 +429,7 @@ function VitalTile({
   value: number | null;
   accent: string;
 }) {
-  const formatted =
-    value === null
-      ? null
-      : spec.unit === 'gbp'
-        ? formatMoney(value)
-        : spec.unit === 'percent'
-          ? `${value.toFixed(1)}%`
-          : spec.unit === 'days'
-            ? `${Math.round(value)}d`
-            : Math.round(value).toLocaleString('en-GB');
+  const formatted = value === null ? null : formatVital(value, spec.unit);
 
   const onTarget =
     value === null || spec.target === null

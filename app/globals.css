@@ -46,9 +46,11 @@
   --radius-sm: 8px;
   --radius-lg: 18px;
 
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue",
-    Arial, sans-serif;
-  --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+  /* next/font sets --font-sans and --font-mono; the stacks after them are the
+     fallback for the moment before the self-hosted face is parsed. */
+  --font: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --mono: var(--font-mono), ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
   --nav-width: 232px;
   --max-width: 1400px;
@@ -125,6 +127,12 @@ body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  /* Tabular figures everywhere by default. A dashboard that reflows its columns
+     every time a number ticks is a dashboard that feels unstable. */
+  font-variant-numeric: tabular-nums;
+  /* Inter's own spacing is tuned tight; a hair of tracking at body size reads
+     better on the retina screens this is used on. */
+  letter-spacing: -0.006em;
 }
 
 a {
@@ -692,4 +700,200 @@ tr:hover td {
   .main {
     padding: 18px 16px 60px;
   }
+}
+
+/* ==========================================================================
+   Charts
+   ==========================================================================
+
+   The hover layer is part of the chart, not an upgrade to it. These styles
+   carry the crosshair, the tooltip and the table view that every time series
+   on this dashboard ships with.
+   ========================================================================== */
+
+.chart {
+  margin: 0;
+}
+
+.chart-plot {
+  position: relative;
+  /* The whole plot is the hit target — the reader aims at a date, never at a
+     2px line. */
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+.chart-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.chart-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 560;
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+.chart-toggle:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.chart-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Values lead, labels follow — here the reader has the series and wants the
+   number, which inverts the legend's hierarchy. */
+.chart-tip {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  box-shadow: var(--shadow-lift);
+  white-space: nowrap;
+  z-index: 2;
+  animation: tip-in 0.09s ease-out;
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform-origin: top left;
+  }
+}
+.chart-tip-value {
+  font-size: 14.5px;
+  font-weight: 660;
+  letter-spacing: -0.015em;
+}
+.chart-tip-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+/* A short stroke, not a filled box: at tooltip density a block of series colour
+   is data-weight ink doing a label's job. */
+.chart-tip-key {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  flex: none;
+}
+
+.chart-table {
+  margin-top: 10px;
+  max-height: 230px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+.chart-table table {
+  font-size: 12.5px;
+}
+.chart-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  padding-top: 8px;
+}
+
+.chart-empty {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 20px 4px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+/* Segments are separated by a gap, never a border. */
+.bar-stack {
+  display: flex;
+  background: var(--surface-2);
+}
+.bar-seg {
+  height: 100%;
+  transition: opacity 0.12s ease;
+  cursor: default;
+}
+.bar-seg:first-child {
+  border-radius: 999px 0 0 999px;
+}
+.bar-seg:last-child {
+  border-radius: 0 999px 999px 0;
+}
+
+/* --------------------------------------------------------------- polish --- */
+
+/* Cards lift slightly on hover only where they are links — a card that responds
+   to the pointer but does nothing when clicked is a lie about affordance. */
+a.card {
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+}
+a.card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-1px);
+}
+
+/* Hero figures. Optical sizing and tighter tracking so a large number reads as
+   one shape rather than a row of digits. */
+.tile-value {
+  font-feature-settings: 'tnum' 1, 'cv05' 1;
+  letter-spacing: -0.028em;
+}
+
+/* Focus is visible everywhere, and it is the accent rather than the browser
+   default — this is operated from an iPad with a keyboard as often as not. */
+:where(a, button, select, input, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-tip {
+    animation: none;
+  }
+  a.card:hover {
+    transform: none;
+  }
+}
+
+/* Project identity.
+   The rail and the icon carry which project this is; the pulse dot carries how
+   it is doing. Two roles, two channels — a reader should never have to work out
+   whether a colour means "Growth OS" or "in trouble". */
+.project-card {
+  position: relative;
+  overflow: hidden;
+  padding-left: 20px;
+}
+.project-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--project-accent, var(--border-strong));
+}
+.project-icon {
+  color: var(--project-accent, var(--text-faint));
+  flex: none;
 }

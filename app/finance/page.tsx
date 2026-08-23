@@ -5,25 +5,16 @@ import { query } from '@/lib/db';
 import { formatMoney, formatPercent } from '@/lib/money';
 import { formatDate } from '@/lib/dates';
 import { PROJECTS } from '@/config/portfolio';
+import { spendColor } from '@/lib/palette';
 import { PageHead } from '@/app/components/PageHead';
 import { Tile } from '@/app/components/Tile';
 import { Icon } from '@/app/components/Icon';
-import { Sparkline, StackedBar } from '@/app/components/Sparkline';
+import { Chart, StackedBar } from '@/app/components/Chart';
 import { SpendForm } from '@/app/components/SpendForm';
 import { DeleteButton } from '@/app/components/DeleteButton';
 
 export const metadata: Metadata = { title: 'Money' };
 export const dynamic = 'force-dynamic';
-
-const CATEGORY_COLOR: Record<string, string> = {
-  infra: '#2B5CE6',
-  tooling: '#7C5CE6',
-  ai: '#12A150',
-  marketing: '#E6842B',
-  contractor: '#C2410C',
-  fees: '#8B93A3',
-  other: '#5C6472',
-};
 
 export default async function FinancePage() {
   const snapshot = await pulse();
@@ -54,7 +45,7 @@ export default async function FinancePage() {
     <>
       <PageHead
         title="Money"
-        sub="Every pound in and out of the portfolio, and what each project has to show for it."
+        sub="Every dollar in and out of the portfolio, and what each project has to show for it."
         generatedAt={snapshot.generatedAt}
         actions={<SpendForm />}
       />
@@ -85,7 +76,7 @@ export default async function FinancePage() {
             value={formatMoney(monthlyNet)}
             icon="scale-balanced"
             foot={`${formatMoney(finance.monthToDateNetPence)} in, ${formatMoney(finance.monthToDateSpendPence)} out`}
-            accent={monthlyNet >= 0 ? 'var(--good)' : 'var(--bad)'}
+            accent={monthlyNet > 0 ? 'var(--good)' : monthlyNet < 0 ? 'var(--bad)' : undefined}
           />
         </div>
 
@@ -114,15 +105,12 @@ export default async function FinancePage() {
                 Net revenue · 60 days
               </h2>
             </div>
-            <Sparkline
-              values={series.map((d) => d.netPence)}
-              height={70}
-              label="Net revenue over 60 days"
+            <Chart
+              points={series.map((d) => ({ date: d.date, value: d.netPence }))}
+              label="Net revenue"
+              height={150}
+              emptyNote="Nothing has come in yet"
             />
-            <div className="row" style={{ justifyContent: 'space-between', marginTop: 6 }}>
-              <span className="tiny faint">{formatDate(series[0]?.date)}</span>
-              <span className="tiny faint">today</span>
-            </div>
           </div>
 
           <div className="card">
@@ -144,8 +132,9 @@ export default async function FinancePage() {
                   segments={categories.map(([name, value]) => ({
                     label: name,
                     value,
-                    color: CATEGORY_COLOR[name] ?? 'var(--idle)',
+                    color: spendColor(name),
                   }))}
+                  format={(v) => formatMoney(v)}
                 />
                 <div className="stack" style={{ gap: 6, marginTop: 12 }}>
                   {categories.map(([name, value]) => (
@@ -156,7 +145,7 @@ export default async function FinancePage() {
                             width: 9,
                             height: 9,
                             borderRadius: 2,
-                            background: CATEGORY_COLOR[name] ?? 'var(--idle)',
+                            background: spendColor(name),
                           }}
                         />
                         {name}
@@ -218,7 +207,14 @@ export default async function FinancePage() {
                       <td className="num">{formatMoney(row.netPence)}</td>
                       <td
                         className="num"
-                        style={{ color: row.profitPence >= 0 ? 'var(--good)' : 'var(--bad)' }}
+                        style={{
+                          color:
+                            row.profitPence > 0
+                              ? 'var(--good)'
+                              : row.profitPence < 0
+                                ? 'var(--bad)'
+                                : undefined,
+                        }}
                       >
                         {formatMoney(row.profitPence)}
                       </td>

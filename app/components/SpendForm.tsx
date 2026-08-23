@@ -8,7 +8,8 @@
  * project it belongs to. A form behind a modal behind a nav item does not get
  * used, and an unused spend ledger makes every ROI number on the site a lie.
  *
- * Amount is typed as pounds and converted to pence exactly once, on submit.
+ * Amount is typed in major units and converted to minor units exactly once, on
+ * submit — one conversion, one place it can be wrong.
  */
 
 import { useState } from 'react';
@@ -149,7 +150,7 @@ export function SpendForm({ defaultProject }: { defaultProject?: string }) {
 
       {pence !== null && pence !== 0 ? (
         <div className="tiny faint">
-          Will be stored as {pence} pence ({formatMoney(pence)}).
+          Will be stored as {pence} minor units ({formatMoney(pence)}).
         </div>
       ) : null}
 
