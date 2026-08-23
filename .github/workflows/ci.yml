@@ -42,6 +42,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      # The Next build passing does not mean the thing that actually ships
+      # passes. The first real deploy of this project failed on a missing
+      # open-next.config.ts that `next build` never looks at, so CI builds the
+      # deploy artefact too.
+      - name: Build the Worker bundle
+        run: npm run cf:build
+
       - name: No secrets committed
         # Cheap belt-and-braces: the real protection is .gitignore and
         # `wrangler secret put`, but a pasted key should never reach a branch.
