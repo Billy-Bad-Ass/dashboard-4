@@ -31,7 +31,21 @@ export interface AskMessage {
   content: string;
 }
 
-const MODEL = 'claude-opus-5';
+/**
+ * Which model answers questions.
+ *
+ * Opus 5 by default because a wrong answer about money is expensive in a way
+ * that a slightly cheaper token price does not offset. But this is a
+ * pre-revenue business paying for its own API credits, so it is a setting
+ * rather than a constant: set ASK_MODEL to `claude-haiku-4-5` and the same
+ * questions cost roughly a fifth as much, at some cost in judgement on the
+ * harder ones. docs/IPAD.md has the actual numbers.
+ */
+const DEFAULT_MODEL = 'claude-opus-5';
+
+function model(): string {
+  return cfEnv()?.ASK_MODEL ?? process.env.ASK_MODEL ?? DEFAULT_MODEL;
+}
 
 /**
  * Tables the SQL tool may read. An allow-list rather than a deny-list: a new
@@ -298,8 +312,10 @@ export async function* askStream(history: AskMessage[]): AsyncGenerator<AskEvent
     yield {
       type: 'error',
       message:
-        'No ANTHROPIC_API_KEY. Set it with `wrangler secret put ANTHROPIC_API_KEY` and the ' +
-        'dashboard can answer questions about itself.',
+        'No ANTHROPIC_API_KEY. Add it under Cloudflare \u2192 Workers & Pages \u2192 ' +
+        'bba-heartbeat \u2192 Settings \u2192 Variables and Secrets, then redeploy. Note this ' +
+        'needs Claude API credits from platform.claude.com \u2014 a Pro or Max subscription ' +
+        'covers the Claude app, not the API.',
     };
     return;
   }
@@ -312,7 +328,7 @@ export async function* askStream(history: AskMessage[]): AsyncGenerator<AskEvent
   try {
     for (let turn = 0; turn < MAX_TURNS; turn += 1) {
       const stream = anthropic.messages.stream({
-        model: MODEL,
+        model: model(),
         max_tokens: 16000,
         // Summarised thinking is shown in the UI: on a money question, seeing
         // which figures it is reconciling is most of the trust.

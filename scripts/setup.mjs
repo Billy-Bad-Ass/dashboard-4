@@ -14,7 +14,7 @@
  */
 
 import { execSync, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync, existsSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 
@@ -87,66 +87,11 @@ console.log(`${tick} Logged in${accountId ? ` ${c.dim(`(account ${accountId})`)}
 
 heading(2, 'Creating storage');
 
-let config = readFileSync('wrangler.jsonc', 'utf8');
+// Shared with the "Set up the dashboard" GitHub Action, so the terminal path
+// and the one-button path cannot drift apart.
+const provision = spawnSync('node', ['scripts/provision.mjs'], { stdio: 'inherit', shell: true });
+const stillMissing = provision.status !== 0;
 
-/**
- * Create a resource and write its id into wrangler.jsonc.
- *
- * A resource that already exists is not an error — that is the normal state on
- * a second run. What matters is whether the id ended up in the config.
- */
-function provision(label, command, idPattern, placeholder) {
-  if (!config.includes(placeholder)) {
-    console.log(`${tick} ${label} ${c.dim('already configured')}`);
-    return;
-  }
-
-  const output = tryRun(`${command} 2>&1`);
-  const id = output ? idPattern.exec(output)?.[1] : null;
-
-  if (id) {
-    config = config.replace(placeholder, id);
-    console.log(`${tick} ${label} created ${c.dim(id)}`);
-    return;
-  }
-
-  if (output && /already exists/i.test(output)) {
-    console.log(`${c.yellow('!')} ${label} exists, but its id is not in wrangler.jsonc.`);
-    console.log(`   ${c.dim('Find it in the Cloudflare dashboard and paste it in by hand.')}`);
-    return;
-  }
-
-  console.log(`${cross} ${label} failed:`);
-  const detail = (output ?? 'no output').split('\n').slice(0, 4);
-  console.log(c.dim(detail.map((line) => `   ${line}`).join('\n')));
-}
-
-provision(
-  'D1 database',
-  'npx wrangler d1 create bba-heartbeat',
-  /"?database_id"?\s*[:=]\s*"?([0-9a-f-]{36})/i,
-  'REPLACE_WITH_D1_DATABASE_ID',
-);
-
-provision(
-  'KV namespace',
-  'npx wrangler kv namespace create CACHE',
-  /"?id"?\s*[:=]\s*"?([0-9a-f]{32})/i,
-  'REPLACE_WITH_KV_NAMESPACE_ID',
-);
-
-const bucket = tryRun('npx wrangler r2 bucket create bba-heartbeat-archive 2>&1') ?? '';
-if (/already (exists|owned)/i.test(bucket)) {
-  console.log(`${tick} R2 bucket ${c.dim('already exists')}`);
-} else if (/created/i.test(bucket)) {
-  console.log(`${tick} R2 bucket created`);
-} else {
-  console.log(`${c.yellow('!')} R2 bucket -- check it by hand; the dashboard runs without it`);
-}
-
-writeFileSync('wrangler.jsonc', config);
-
-const stillMissing = config.includes('REPLACE_WITH_');
 if (stillMissing) {
   console.log(`\n${c.yellow('!')} wrangler.jsonc still has placeholders. Fill them in before deploying.`);
 }

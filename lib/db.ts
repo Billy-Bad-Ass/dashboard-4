@@ -22,8 +22,9 @@ export type Row = Record<string, unknown>;
 export class NoDatabaseError extends Error {
   constructor() {
     super(
-      'No D1 binding. Create the database with `wrangler d1 create bba-heartbeat`, ' +
-        'put the id in wrangler.jsonc, then `npm run db:migrate:local`.',
+      'No D1 binding. Run the "Set up the dashboard" workflow in the repository\'s ' +
+        'Actions tab \u2014 it creates the database and wires it up. With a terminal: ' +
+        '`npm run setup`.',
     );
     this.name = 'NoDatabaseError';
   }

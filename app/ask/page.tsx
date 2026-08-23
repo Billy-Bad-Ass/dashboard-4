@@ -25,9 +25,19 @@ export default function AskPage() {
           <div>
             <strong>No Anthropic API key set.</strong>
             <div className="small muted" style={{ marginTop: 3 }}>
-              Get one from console.anthropic.com, then{' '}
-              <span className="mono">wrangler secret put ANTHROPIC_API_KEY</span>. The same key
-              powers the scheduled agents.
+              Get one from{' '}
+              <a href="https://platform.claude.com" target="_blank" rel="noreferrer noopener">
+                platform.claude.com
+              </a>
+              , add it as <span className="mono">ANTHROPIC_API_KEY</span> under Cloudflare →
+              Workers &amp; Pages → bba-heartbeat → Settings → Variables and Secrets, then
+              redeploy.
+              <br />
+              This is the one part of the dashboard that costs money per use: the Claude API is
+              billed separately from a Pro or Max subscription, which covers the Claude app rather
+              than the API. Roughly £0.09 a question, or a fifth of that with an{' '}
+              <span className="mono">ASK_MODEL</span> variable set to{' '}
+              <span className="mono">claude-haiku-4-5</span>.
             </div>
           </div>
         </div>
