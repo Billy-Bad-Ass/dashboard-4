@@ -62,6 +62,9 @@ npm run build          # catches server/client component mistakes
   an apportioned share.
 - **The spend ledger is a financial record.** Agents propose changes to it; they
   never apply them.
+- **`/ask` is read-only.** Its SQL tool accepts a single `SELECT` against an
+  allow-listed set of tables and nothing else. If a question would need a write,
+  the answer is which page of the dashboard does it — never a write tool.
 
 ## Adding a project
 
@@ -79,5 +82,6 @@ revenue model (a revenue tile on a project with no product is theatre) and write
 | ROI, burn, overhead maths | `lib/finance.ts` |
 | What the heartbeat polls | `lib/heartbeat.ts`, `lib/connectors/` |
 | What the cron does | `lib/cron.ts` |
+| The Ask page's tools or system prompt | `lib/ask.ts` |
 | Schema | a new file in `db/migrations/` — never edit an applied one |
 | Colours, spacing, themes | `app/globals.css` (tokens on `:root`) |

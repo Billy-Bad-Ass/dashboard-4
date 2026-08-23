@@ -38,13 +38,24 @@ and every vital honours it:
 
 ```bash
 npm install
-npm run build
-npm start                 # → http://localhost:3000
+npm run setup             # creates the storage, loads your secrets, deploys
+```
+
+`npm run setup` is the whole first-time flow: it creates the D1 database, KV
+namespace and R2 bucket, writes their ids into `wrangler.jsonc`, applies the
+migrations, walks through each secret explaining where to get it, and offers to
+deploy. It is idempotent — safe to re-run after a half-finished attempt.
+
+To just look at it locally:
+
+```bash
+npm run build && npm start   # → http://localhost:3000
 ```
 
 It runs with no configuration at all — every connector degrades to a clearly
 labelled "not connected" state, and `/setup` gives the exact command for each
-one. See **[docs/RUNBOOK.md](docs/RUNBOOK.md)** to wire it up properly.
+one. See **[docs/RUNBOOK.md](docs/RUNBOOK.md)** for the manual sequence and
+troubleshooting.
 
 ## How it fits together
 
@@ -58,6 +69,7 @@ one. See **[docs/RUNBOOK.md](docs/RUNBOOK.md)** to wire it up properly.
 | `lib/crm.ts` | Clients, deals, interactions. Prospects and clients share one table. |
 | `lib/connectors/` | Stripe, GitHub, Cloudflare, Google Calendar. Each one survives being unconfigured. |
 | `lib/cron.ts` | The scheduled tick: poll, snapshot, reconcile, prune. |
+| `lib/ask.ts` | The chat brain. Gives Claude tools over the live data rather than a context dump. |
 | `app/` | The dashboard. Server components throughout; client components only where something is genuinely interactive. |
 | `.claude/` | Subagents, workflows and slash commands — see [docs/AGENTS.md](docs/AGENTS.md). |
 
@@ -66,6 +78,7 @@ one. See **[docs/RUNBOOK.md](docs/RUNBOOK.md)** to wire it up properly.
 | Page | What it answers |
 | --- | --- |
 | `/` | Is anything alive, and is anything wrong? |
+| `/ask` | Anything, in plain English — it queries the real data and shows what it looked up. |
 | `/projects/[slug]` | For this project: what does it earn, what has it cost, and what is genuinely blocking its first pound? |
 | `/finance` | Where every pound went, and what each project has to show for it. |
 | `/clients` | Who is a client, who might become one, and who is going cold. |
@@ -111,7 +124,7 @@ Four projects, registered in `config/portfolio.ts`:
 
 ```bash
 npm run typecheck        # strict, noUncheckedIndexedAccess
-npm test                 # 37 tests, no build step
+npm test                 # 47 tests, no build step
 npm run workflows:check  # validates .claude/workflows/*.mjs
 npm run check            # typecheck + test
 ```
