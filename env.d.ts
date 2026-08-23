@@ -21,6 +21,8 @@ declare global {
     CALENDAR_ICS_URL?: string;
     /** Powers "Ask the dashboard" (/ask) and the scheduled agents. */
     ANTHROPIC_API_KEY?: string;
+    /** Overrides the model /ask uses. Defaults to claude-opus-5. */
+    ASK_MODEL?: string;
     /** Shared secret for the write API and the cron-triggered agent dispatch. */
     DASHBOARD_TOKEN?: string;
   }

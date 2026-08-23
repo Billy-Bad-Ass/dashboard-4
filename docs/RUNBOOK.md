@@ -5,6 +5,10 @@ to do when a part of it stops.
 
 ## First deploy
 
+> **Working from an iPad or a phone?** [docs/IPAD.md](IPAD.md) is the same thing
+> without a terminal — two secrets into GitHub, then one button in the Actions
+> tab. This page assumes a command line.
+
 ### The short version
 
 ```bash

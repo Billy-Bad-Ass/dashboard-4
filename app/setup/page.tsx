@@ -37,7 +37,7 @@ export default async function SetupPage() {
       name: 'CLOUDFLARE_API_TOKEN',
       set: Boolean(env?.CLOUDFLARE_API_TOKEN ?? process.env.CLOUDFLARE_API_TOKEN),
       what: 'Worker traffic — what the £5/month is actually buying.',
-      how: 'Cloudflare → My Profile → API Tokens → custom token with Account Analytics: Read.',
+      how: 'Cloudflare → your icon → API Tokens → Create Token → custom → Account Analytics: Read.',
     },
     {
       name: 'CLOUDFLARE_ACCOUNT_ID',
@@ -49,14 +49,22 @@ export default async function SetupPage() {
       name: 'CALENDAR_ICS_URL',
       set: Boolean(env?.CALENDAR_ICS_URL ?? process.env.CALENDAR_ICS_URL),
       what: 'Read-only feed for bbacentralworkspace@gmail.com.',
-      how: 'Google Calendar → Settings → the calendar → "Secret address in iCal format".',
+      how: 'Google Calendar → gear → Settings → tap the calendar → "Secret address in iCal format".',
     },
     {
       name: 'DASHBOARD_TOKEN',
       set: Boolean(env?.DASHBOARD_TOKEN ?? process.env.DASHBOARD_TOKEN),
       what: 'Guards every write endpoint and lets agents report their runs.',
-      how: 'Any long random string. Generate with `openssl rand -hex 32`.',
+      how: 'Any long random string, like a password.',
       critical: true,
+    },
+    {
+      name: 'ANTHROPIC_API_KEY',
+      set: Boolean(env?.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY),
+      what: 'The Ask page. Everything else works without it.',
+      how:
+        'platform.claude.com → API keys. Billed separately from a Claude Pro or Max ' +
+        'subscription — those cover the app, not the API.',
     },
   ];
 
@@ -78,7 +86,9 @@ export default async function SetupPage() {
               <strong>No D1 binding.</strong>
               <div className="small muted" style={{ marginTop: 3 }}>
                 Until the database exists, the ledger, CRM, metric history and agent log are all
-                empty — and they will read as zeroes rather than errors. Create it first.
+                empty — and they will read as zeroes rather than errors. Run the{' '}
+                <strong>Set up the dashboard</strong> workflow in the repository&rsquo;s Actions tab
+                first; it creates everything and deploys.
               </div>
             </div>
           </div>
@@ -91,9 +101,10 @@ export default async function SetupPage() {
               <strong>Write endpoints are unauthenticated.</strong>
               <div className="small muted" style={{ marginTop: 3 }}>
                 With no <span className="mono">DASHBOARD_TOKEN</span> set, anything that can reach
-                this Worker can add spend rows and edit clients. That is fine on{' '}
-                <span className="mono">wrangler dev</span> and not fine once deployed. Set the token,
-                and put Cloudflare Access in front of the Worker for real protection.
+                this Worker can add spend rows and edit clients. Fine while it is only running on
+                your own machine; not fine once it is deployed. Set the token, and put{' '}
+                <strong>Cloudflare Access</strong> in front of the Worker (Zero Trust → Access →
+                Applications) for real protection — free on the plan you already pay for.
               </div>
             </div>
           </div>
@@ -158,6 +169,13 @@ export default async function SetupPage() {
               </tbody>
             </table>
           </div>
+          <div className="tiny faint" style={{ marginTop: 12 }}>
+            Everything here except <span className="mono">ANTHROPIC_API_KEY</span> is covered by
+            the Cloudflare plan already being paid for. The Ask page calls the Claude API, which
+            is billed separately from a Claude subscription — roughly £0.09 a question, or a fifth
+            of that with an <span className="mono">ASK_MODEL</span> variable set to{' '}
+            <span className="mono">claude-haiku-4-5</span>.
+          </div>
         </div>
 
         <div className="card">
@@ -166,43 +184,85 @@ export default async function SetupPage() {
               <Icon name="database" size={13} />
               First-time setup
             </h2>
+            <span className="tiny faint">no terminal needed</span>
           </div>
+
+          <div className="notice notice-info" style={{ marginBottom: 14 }}>
+            <Icon name="bolt" size={16} />
+            <div>
+              <strong>Everything below is done in a browser.</strong>
+              <div className="small muted" style={{ marginTop: 3 }}>
+                A GitHub Actions runner does the command-line work. Full tap-by-tap version:{' '}
+                <a
+                  href="https://github.com/Billy-Bad-Ass/Project-4/blob/main/docs/IPAD.md"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  docs/IPAD.md
+                </a>
+                .
+              </div>
+            </div>
+          </div>
+
           <Steps
             steps={[
               {
-                title: 'Create the database and cache',
-                body: `wrangler d1 create bba-heartbeat
-wrangler kv namespace create CACHE
-wrangler r2 bucket create bba-heartbeat-archive`,
-                note: 'Paste the printed database_id and KV id into wrangler.jsonc, replacing the REPLACE_WITH_ placeholders.',
+                title: 'Give GitHub access to Cloudflare',
+                body: [
+                  'Cloudflare → your icon (top right) → API Tokens → Create Token',
+                  '→ "Edit Cloudflare Workers" template, then ADD a permission row:',
+                  '   Account → D1 → Edit',
+                  '',
+                  'Then in this repo: Settings → Secrets and variables → Actions,',
+                  'add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.',
+                ].join('\n'),
+                note: 'The account id is in the right-hand panel of Workers & Pages.',
               },
               {
-                title: 'Apply the schema',
-                body: `npm run db:migrate:local && npm run db:seed:local   # local
-npm run db:migrate:remote && npm run db:seed:remote  # production`,
-                note: 'The seed inserts exactly one row: the £5/month Cloudflare subscription. No fake clients, no sample revenue.',
+                title: 'Press the button',
+                body: 'GitHub → Actions → "Set up the dashboard" → Run workflow',
+                note:
+                  'Creates the database, cache and bucket, sets up the tables and deploys. ' +
+                  'About three minutes. Your URL is in the run summary. Safe to re-run.',
               },
               {
-                title: 'Set the secrets',
-                body: `wrangler secret put STRIPE_SECRET_KEY
-wrangler secret put GITHUB_TOKEN
-wrangler secret put CLOUDFLARE_API_TOKEN
-wrangler secret put CLOUDFLARE_ACCOUNT_ID
-wrangler secret put CALENDAR_ICS_URL
-wrangler secret put DASHBOARD_TOKEN`,
-                note: 'For local development put the same names in .dev.vars, which is gitignored.',
+                title: 'Lock it down — before adding any keys',
+                body: [
+                  'Cloudflare → Zero Trust → Access → Applications → Add an application',
+                  '→ Self-hosted → public hostname: your worker URL',
+                  '→ policy: Include → Emails → your address',
+                ].join('\n'),
+                note:
+                  'Until this is on, anyone with the URL can read your finances and edit your ' +
+                  'clients. Free for up to 50 people on the plan you already pay for.',
               },
               {
-                title: 'Deploy',
-                body: 'npm run cf:deploy',
-                note: 'The cron triggers in wrangler.jsonc start firing on the first successful deploy.',
+                title: 'Add the keys above',
+                body: [
+                  'Cloudflare → Workers & Pages → bba-heartbeat → Settings',
+                  '→ Variables and Secrets → Add → type: Secret',
+                ].join('\n'),
+                note: 'All optional. Add what you want; this page keeps showing what is missing.',
+              },
+              {
+                title: 'Redeploy so the keys take effect',
+                body: 'GitHub → Actions → "Deploy" → Run workflow',
+                note: 'Adding a secret does not restart the Worker. This does.',
               },
               {
                 title: 'Let the agents report in',
-                body: `# In each project repo's GitHub settings → Secrets:
-DASHBOARD_URL   = https://bba-heartbeat.<your-subdomain>.workers.dev
-DASHBOARD_TOKEN = the same value you set above`,
-                note: 'Without these the workflows still run — their results just never reach the agents console.',
+                body: [
+                  'This repo → Settings → Secrets and variables → Actions:',
+                  '  DASHBOARD_URL      this dashboard\'s URL',
+                  '  DASHBOARD_TOKEN    the same value you set above',
+                  '',
+                  'For the agents to run free on a Claude Max plan, also add:',
+                  '  CLAUDE_CODE_OAUTH_TOKEN   from `claude setup-token`',
+                ].join('\n'),
+                note:
+                  'Without the first two the agents still run, their results just never reach ' +
+                  'the Agents page.',
               },
             ]}
           />

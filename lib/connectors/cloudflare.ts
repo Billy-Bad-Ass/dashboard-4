@@ -65,7 +65,8 @@ export async function fetchCloudflare(windowDays = 7): Promise<ConnectorResult<C
   if (!token || !account) {
     return unconfigured(
       'No CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID. Create a token with ' +
-        '"Account Analytics: Read" only, then set both with `wrangler secret put`.',
+        '"Account Analytics: Read", then add both under Cloudflare \u2192 Workers & Pages ' +
+        '\u2192 bba-heartbeat \u2192 Settings \u2192 Variables and Secrets.',
     );
   }
 

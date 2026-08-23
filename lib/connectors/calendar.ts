@@ -12,7 +12,7 @@
  *     Worker with one fetch.
  *
  * Get it from Google Calendar → Settings → the calendar → "Secret address in
- * iCal format", then `wrangler secret put CALENDAR_ICS_URL`. Treat it as a
+ * iCal format", and set it as CALENDAR_ICS_URL on the Worker. Treat it as a
  * password: anyone holding it can read the calendar. Regenerating it in Google
  * revokes the old one.
  *
@@ -166,9 +166,10 @@ export async function fetchCalendar(): Promise<ConnectorResult<CalendarEvent[]>>
 
   if (!url) {
     return unconfigured(
-      `No calendar feed for ${account}. In Google Calendar open Settings → the calendar → ` +
-        '"Secret address in iCal format", then `wrangler secret put CALENDAR_ICS_URL`. ' +
-        'Treat that URL as a password.',
+      `No calendar feed for ${account}. In Google Calendar: gear \u2192 Settings \u2192 tap ` +
+        'the calendar on the left \u2192 "Secret address in iCal format". Add it as ' +
+        'CALENDAR_ICS_URL under Cloudflare \u2192 Workers & Pages \u2192 bba-heartbeat \u2192 ' +
+        'Settings \u2192 Variables and Secrets. Treat that URL as a password.',
     );
   }
 

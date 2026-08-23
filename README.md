@@ -36,6 +36,13 @@ and every vital honours it:
 
 ## Quick start
 
+**No terminal? Read [docs/IPAD.md](docs/IPAD.md).** The whole setup runs from a
+browser: two secrets into GitHub, then press one button in the Actions tab and a
+runner does the command-line work. That is the supported path — this dashboard is
+operated from an iPad.
+
+With a terminal:
+
 ```bash
 npm install
 npm run setup             # creates the storage, loads your secrets, deploys
@@ -53,9 +60,21 @@ npm run build && npm start   # → http://localhost:3000
 ```
 
 It runs with no configuration at all — every connector degrades to a clearly
-labelled "not connected" state, and `/setup` gives the exact command for each
-one. See **[docs/RUNBOOK.md](docs/RUNBOOK.md)** for the manual sequence and
+labelled "not connected" state, and `/setup` shows what is missing. See
+**[docs/RUNBOOK.md](docs/RUNBOOK.md)** for the manual sequence and
 troubleshooting.
+
+### What it costs to run
+
+Cloudflare, GitHub Actions and the scheduled agents are all covered by things
+already paid for — the $5/month Workers plan and, for the agents, a Claude Max
+subscription via `CLAUDE_CODE_OAUTH_TOKEN`.
+
+The `/ask` page is the exception: it is a deployed web app calling the Claude
+API, which is billed separately from any Claude subscription. Roughly £0.09 a
+question on the default model, or about a fifth of that with `ASK_MODEL` set to
+`claude-haiku-4-5`. Leave `ANTHROPIC_API_KEY` unset and everything else still
+works.
 
 ## How it fits together
 

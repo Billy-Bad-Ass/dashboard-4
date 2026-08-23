@@ -57,8 +57,9 @@ export async function fetchStripe(sinceDays = 90): Promise<ConnectorResult<Strip
   const stripe = client();
   if (!stripe) {
     return unconfigured(
-      'No STRIPE_SECRET_KEY. Set a restricted read-only key with ' +
-        '`wrangler secret put STRIPE_SECRET_KEY`.',
+      'No STRIPE_SECRET_KEY. Add it as a secret under ' +
+        'Cloudflare \u2192 Workers & Pages \u2192 bba-heartbeat \u2192 Settings \u2192 ' +
+        'Variables and Secrets. Use a restricted key with read scopes only, in live mode.',
     );
   }
 

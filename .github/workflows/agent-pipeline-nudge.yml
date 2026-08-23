@@ -34,7 +34,12 @@ jobs:
         id: nudge
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Prefer the Claude subscription token when it is set: on a Max plan
+          # these runs cost nothing, where an API key bills per token. The
+          # action gives the API key precedence when BOTH are present, so the
+          # key is deliberately blanked when a subscription token exists.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN == '' && secrets.ANTHROPIC_API_KEY || '' }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             Use the `pipeline-nudge` subagent.
