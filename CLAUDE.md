@@ -10,7 +10,7 @@ apart.
 
 ```
 value === null   →  renders "—"     nothing reported this
-value === 0      →  renders "£0.00"  measured, and genuinely zero
+value === 0      →  renders "$0.00"  measured, and genuinely zero
 roi   === null   →  renders "—"     nothing spent, so the ratio is undefined
 roi   === -100   →  renders "-100%"  money out, none back — a real number
 ```
@@ -22,7 +22,7 @@ renders the difference. Do not "helpfully" default a null to zero anywhere.
 
 ## Money
 
-**Integer pence, everywhere, always.** `500` is £5.00. This matches Project-2.
+**Integer pence, everywhere, always.** `500` is $5.00. This matches Project-2.
 
 - One formatter: `formatMoney()` in `lib/money.ts`, and it takes pence.
 - `parseMoney()` is the only place a typed string becomes a number.

@@ -34,8 +34,8 @@ export default async function FinancePage() {
     revenueSeries(60),
   ]);
 
-  // Category totals use expanded occurrences, so a £5/month subscription that
-  // has run four months counts as £20 here rather than £5.
+  // Category totals use expanded occurrences, so a $5/month subscription that
+  // has run four months counts as $20 here rather than $5.
   const now = new Date();
   const epoch = new Date('2000-01-01T00:00:00Z');
   const occurrences = spendRows.flatMap((row) => expandSpend(row, epoch, now));

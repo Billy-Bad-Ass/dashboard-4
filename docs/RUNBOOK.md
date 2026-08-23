@@ -45,7 +45,7 @@ npm run db:migrate:local  && npm run db:seed:local     # local dev
 npm run db:migrate:remote && npm run db:seed:remote    # production
 ```
 
-The seed inserts exactly one row: the £5/month Cloudflare subscription. There
+The seed inserts exactly one row: the $5/month Cloudflare subscription. There
 are no example clients and no sample revenue — an empty CRM that says "empty" is
 more useful than one full of invented people you then have to remember are fake.
 

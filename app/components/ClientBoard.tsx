@@ -18,7 +18,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PROJECTS } from '@/config/portfolio';
 import { CLIENT_STATUSES, STATUS_META, type ClientStatus, type ClientWithDeals } from '@/lib/crm';
-import { formatMoney, parseMoney } from '@/lib/money';
+import { formatMoney, parseMoney, symbolFor, DEFAULT_CURRENCY } from '@/lib/money';
 import { formatDate, relativeTime } from '@/lib/dates';
 import { Icon } from './Icon';
 
@@ -171,7 +171,7 @@ export function ClientBoard({ clients }: { clients: ClientWithDeals[] }) {
               <label htmlFor="c-heat">Heat (1–5)</label>
               <input id="c-heat" name="heat" type="number" min={1} max={5} defaultValue={1} />
             </div>
-            <Field id="c-deal" label="Opening value (£)" name="deal_value" placeholder="Optional" />
+            <Field id="c-deal" label={`Opening value (${symbolFor(DEFAULT_CURRENCY)})`} name="deal_value" placeholder="Optional" />
           </div>
           <div className="field">
             <label htmlFor="c-notes">Notes</label>

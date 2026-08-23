@@ -1,0 +1,86 @@
+name: Set up email routing
+
+# Creates support@ and hello@ on bbanetwork.org and forwards them to your Gmail,
+# so the address the storefront prints at buyers actually receives mail.
+#
+# The Cloudflare connector Claude has does not cover Email Routing — it is the
+# developer platform only (Workers, D1, KV, R2). So this workflow does it
+# through the REST API instead, with a token you create for the purpose and
+# delete afterwards.
+#
+# ── Before running ────────────────────────────────────────────────────────────
+#
+# 1. Cloudflare -> your icon (top right) -> API Tokens -> Create Token -> Custom
+#    Permissions, three rows:
+#      Account -> Email Routing Addresses -> Edit
+#      Zone    -> Email Routing Rules     -> Edit
+#      Zone    -> DNS                     -> Edit      (for the MX records)
+#    Zone Resources: Include -> Specific zone -> bbanetwork.org
+#
+# 2. This repo -> Settings -> Secrets and variables -> Actions:
+#      CF_SETUP_TOKEN  = that token
+#
+# 3. Actions -> "Set up email routing" -> Run workflow
+#
+# ── After running ─────────────────────────────────────────────────────────────
+#
+# DELETE the token in Cloudflare and the secret here. It is far wider than the
+# deploy token and there is no reason to keep it once this has run once.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zone:
+        description: 'Domain to set up'
+        required: true
+        default: 'bbanetwork.org'
+      forward_to:
+        description: 'Inbox that should receive the mail'
+        required: true
+        default: 'bbacentralworkspace@gmail.com'
+      addresses:
+        description: 'Comma-separated prefixes to create'
+        required: true
+        default: 'support,hello'
+      catch_all:
+        description: 'Also forward anything@ that does not match?'
+        type: boolean
+        default: true
+
+concurrency:
+  group: email-routing
+  cancel-in-progress: false
+
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the token is there
+        run: |
+          if [ -z "${{ secrets.CF_SETUP_TOKEN }}" ]; then
+            {
+              echo "## Missing \`CF_SETUP_TOKEN\`"
+              echo ""
+              echo "This workflow needs a wider Cloudflare token than the deploy one."
+              echo "The header comment in \`.github/workflows/email-routing.yml\` has the"
+              echo "exact permissions. Add it under Settings -> Secrets and variables ->"
+              echo "Actions, run this again, then delete it."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Set up routing
+        env:
+          CF_TOKEN: ${{ secrets.CF_SETUP_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ZONE: ${{ inputs.zone }}
+          FORWARD_TO: ${{ inputs.forward_to }}
+          ADDRESSES: ${{ inputs.addresses }}
+          CATCH_ALL: ${{ inputs.catch_all }}
+        run: node scripts/email-routing.mjs

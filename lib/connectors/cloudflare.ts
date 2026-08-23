@@ -1,5 +1,5 @@
 /**
- * Cloudflare — traffic, and what the £5/month is actually buying.
+ * Cloudflare — traffic, and what the $5/month is actually buying.
  *
  * Uses the GraphQL analytics API, which is the only endpoint that returns
  * Workers request counts without a per-zone subscription. The token needs

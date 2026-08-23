@@ -33,7 +33,7 @@ storefront sells from.**
   `bbanetwork.org/best/...`, because the domain itself is a relevance signal.
 
 **Recommendation:** buy Project 1 its own cheap domain matched to whichever
-niche it ships with. Around £8–12/year, and it keeps `bbanetwork.org` clean if
+niche it ships with. Around $10–15/year, and it keeps `bbanetwork.org` clean if
 the experiment goes badly. Record it in the ledger against `project-1` so its
 ROI carries its own cost.
 

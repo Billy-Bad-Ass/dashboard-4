@@ -66,14 +66,15 @@ export interface VitalSpec {
   hint: string;
 }
 
-export const CURRENCY = 'gbp' as const;
+/** Re-exported so there is exactly one place the currency is decided. */
+export { DEFAULT_CURRENCY as CURRENCY } from '@/lib/money';
 
 /**
- * Money is stored and passed around in pence, everywhere, always. `500` is
- * £5.00. Project-2 uses the same convention; the classic failure in this
- * codebase is a 100x error, so there is one formatter and it takes pence.
+ * Money is stored and passed around in minor units, everywhere, always. `500`
+ * is $5.00. Project-2 uses the same convention; the classic failure in this
+ * codebase is a 100x error, so there is one formatter and it takes minor units.
  */
-export const MONEY_UNIT = 'pence' as const;
+export const MONEY_UNIT = 'minor' as const;
 
 export const PROJECTS: Project[] = [
   {
@@ -196,22 +197,26 @@ export const PROJECTS: Project[] = [
   },
   {
     slug: 'project-3',
-    name: 'Project 3',
-    tagline: 'Unstarted. Repository exists, nothing in it but a README.',
+    name: 'Hardstop',
+    tagline: 'Automated trading research. Refuses to risk money until a strategy survives testing.',
     repo: 'Billy-Bad-Ass/Project-3',
-    stage: 'idea',
+    stage: 'building',
     revenueModel: 'none',
-    accent: '#8B93A3',
-    icon: 'seedling',
+    accent: '#C2410C',
+    icon: 'chart-line',
     startedOn: '2026-08-23',
     reality:
-      'Genuinely empty — one README, one line. It is on the dashboard so the slot is visible ' +
-      'and the decision to fill it stays deliberate. Give it a revenue model in ' +
-      'config/portfolio.ts and its page reshapes itself around it.',
+      'Research, not a trading system. Nothing in the repository can place an order, send, ' +
+      'publish or spend — that is structural rather than policy. It moved off Cloudflare on ' +
+      '2026-08-21: the D1 database and both Workers were deleted and the same code now runs on ' +
+      'GitHub Actions through a D1-over-node:sqlite adapter. Its revenue model is deliberately ' +
+      '"none" — a strategy that has not survived honest testing is a liability, not an asset, ' +
+      'and putting a revenue tile on it would invite exactly the impatience it is built against.',
     gates: [
-      'Decide what it is',
-      'Pick a revenue model and set it in config/portfolio.ts',
-      'Ship something reachable',
+      'Find a strategy that survives out-of-sample testing without curve-fitting',
+      'Establish the null result honestly — most candidates should fail, and be seen to',
+      'Decide what evidence would justify risking real money, before there is any',
+      'Only then: a broker, a position size, and a human who presses the button',
     ],
     vitals: [
       {
@@ -220,7 +225,7 @@ export const PROJECTS: Project[] = [
         source: 'github',
         unit: 'count',
         target: null,
-        hint: 'Any movement at all. Right now this is the only signal it has.',
+        hint: 'Research cadence. This project has no revenue signal by design.',
       },
       {
         key: 'days_since_commit',
@@ -229,7 +234,15 @@ export const PROJECTS: Project[] = [
         unit: 'days',
         lowerIsBetter: true,
         target: 14,
-        hint: 'How long the slot has been sitting idle.',
+        hint: 'Research that has stopped is research that has quietly been abandoned.',
+      },
+      {
+        key: 'ci_status',
+        label: 'Test suite',
+        source: 'github',
+        unit: 'count',
+        target: null,
+        hint: 'The fences are enforced by tests. A red suite means a fence may be down.',
       },
     ],
   },
@@ -279,6 +292,66 @@ export const PROJECTS: Project[] = [
         unit: 'gbp',
         target: null,
         hint: 'Its share of the Cloudflare bill. Counted against the portfolio, not excluded.',
+      },
+    ],
+  },
+  {
+    slug: 'project-5',
+    name: 'Growth OS',
+    tagline: 'Agent-run paid ads and organic publishing, with a human approving every spend.',
+    repo: 'Billy-Bad-Ass/Project-5',
+    stage: 'building',
+    revenueModel: 'none',
+    accent: '#E6842B',
+    icon: 'tower-broadcast',
+    startedOn: '2026-08-23',
+    reality:
+      'Not deployed — wrangler.toml still carries a placeholder database id. When it is, this ' +
+      'is the only project that deliberately SPENDS to make the others earn: ads on five ' +
+      'platforms, organic posting to nine, and Stripe revenue joined back to ad spend so the ' +
+      'number driving decisions is return on ad spend rather than clicks. Its revenue model is ' +
+      '"none" because it earns nothing itself; its cost is the point, and the thing to watch is ' +
+      'whether that cost turns into revenue somewhere else in the portfolio.',
+    gates: [
+      'Deploy it — the D1 id in wrangler.toml is still a placeholder',
+      'Connect at least one ad platform and one social platform for real',
+      'Prove the approval gate holds: nothing spends or publishes without a human',
+      'Get one campaign to a measurable ROAS, positive or negative — either is information',
+    ],
+    vitals: [
+      {
+        key: 'ad_spend',
+        label: 'Ad spend',
+        source: 'ledger',
+        unit: 'gbp',
+        target: null,
+        hint: 'Money out through the ad platforms. Reported in minor units like everything else.',
+      },
+      {
+        key: 'roas',
+        label: 'Return on ad spend',
+        source: 'manual',
+        unit: 'percent',
+        target: 100,
+        hint: 'Stripe revenue attributed back to spend. Below 100% is losing money to buy data.',
+      },
+      {
+        key: 'pending_approvals',
+        label: 'Awaiting approval',
+        source: 'manual',
+        unit: 'count',
+        lowerIsBetter: true,
+        target: 5,
+        hint: 'Drafts and budgets queued for a human. A growing queue is the bottleneck.',
+      },
+      {
+        key: 'days_since_commit',
+        label: 'Days since commit',
+        source: 'github',
+        unit: 'days',
+        lowerIsBetter: true,
+        target: 14,
+        hint: 'Days since the repository last moved.',
       },
     ],
   },
