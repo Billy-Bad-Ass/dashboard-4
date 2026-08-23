@@ -234,9 +234,12 @@ export const PROJECTS: Project[] = [
     startedOn: '2026-08-23',
     reality:
       'Research, not a trading system. Nothing in the repository can place an order, send, ' +
-      'publish or spend — that is structural rather than policy. It moved off Cloudflare on ' +
-      '2026-08-21: the D1 database and both Workers were deleted and the same code now runs on ' +
-      'GitHub Actions through a D1-over-node:sqlite adapter. Its revenue model is deliberately ' +
+      'publish or spend — that is structural rather than policy. Its hosting is UNCLEAR and this ' +
+      'entry will not guess: it was recorded as having moved off Cloudflare on 2026-08-21, with ' +
+      'the D1 database and both Workers deleted in favour of GitHub Actions and a ' +
+      'D1-over-node:sqlite adapter — but bba-trading-runner and bba-trading-watchman were ' +
+      'created on the account again on 2026-08-23. Both statements cannot be current. Ask ' +
+      'before relying on either. Its revenue model is deliberately ' +
       '"none" — a strategy that has not survived honest testing is a liability, not an asset, ' +
       'and putting a revenue tile on it would invite exactly the impatience it is built against.',
     gates: [
@@ -332,20 +335,21 @@ export const PROJECTS: Project[] = [
     accent: '#C2610A',
     icon: 'tower-broadcast',
     startedOn: '2026-08-23',
+    liveUrl: 'https://bba-growth-os.bbacentralworkspace.workers.dev',
     reality:
-      'Half-deployed, and stuck on one line. Its D1 database exists and is fully migrated — 17 ' +
-      'tables including spend_ledger and revenue_events — and its R2 media bucket exists. But ' +
-      'there is no bba-growth-os Worker, because wrangler.toml still reads ' +
-      'REPLACE_WITH_D1_DATABASE_ID and a binding pointing at a placeholder fails the deploy ' +
-      'outright. Exactly the trap Project 4 hit. When it does run, this is the only project ' +
-      'that deliberately SPENDS to make the others earn: ads on five platforms, organic posting ' +
-      'to nine, and Stripe revenue joined back to ad spend so the number driving decisions is ' +
-      'return on ad spend rather than clicks. Its revenue model is "none" because it earns ' +
-      'nothing itself — its cost is the point, and the thing to watch is whether that cost ' +
-      'turns into revenue somewhere else in this portfolio.',
+      'Deployed on 2026-08-23 and connected to nothing. Two blockers cleared in sequence: the ' +
+      'wrangler.toml placeholders were replaced with the real D1, KV and R2 ids, and then the ' +
+      'repository had no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID at all, so every run ' +
+      'died at the migration step before touching Cloudflare. Both fixed; the Worker is live. ' +
+      'What it does NOT have is a single ad or social platform connected, which is the whole ' +
+      'product — so treat "deployed" as the start of the work, not the end of it. This is the ' +
+      'only project that deliberately SPENDS to make the others earn: ads on five platforms, ' +
+      'organic posting to nine, and Stripe revenue joined back to ad spend so the number ' +
+      'driving decisions is return on ad spend rather than clicks. Its revenue model is "none" ' +
+      'because it earns nothing itself — its cost is the point, and the thing to watch is ' +
+      'whether that cost turns into revenue somewhere else in this portfolio.',
     gates: [
-      'Paste the real D1 id into wrangler.toml — the database is already there and migrated',
-      'Deploy the Worker, and confirm its cron triggers registered',
+      'Confirm its cron triggers actually registered — a deployed Worker is not a running one',
       'Connect at least one ad platform and one social platform for real',
       'Prove the approval gate holds: nothing spends or publishes without a human',
       'Get one campaign to a measurable ROAS, positive or negative — either is information',
@@ -397,8 +401,10 @@ export const PROJECTS: Project[] = [
     accent: '#0E7490',
     icon: 'circle-nodes',
     startedOn: '2026-08-23',
+    liveUrl: 'https://bba-network-hub.bbacentralworkspace.workers.dev',
     reality:
-      'The shopfront, not a business. It earns nothing itself: a visitor who buys an audit is ' +
+      'Deployed as bba-network-hub on 2026-08-23. The shopfront, not a business. It earns ' +
+      'a visitor who buys an audit is ' +
       'revenue for project-1 and one who buys a guide is revenue for project-2, and attributing ' +
       'a sale here would double-count it. What it owns is whether a stranger who lands on ' +
       'bbanetwork.org understands what is on offer and gets to the right place — which is ' +
