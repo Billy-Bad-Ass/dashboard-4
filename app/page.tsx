@@ -7,7 +7,7 @@ import { PageHead } from './components/PageHead';
 import { SetupNotice } from './components/SetupNotice';
 import { Tile } from './components/Tile';
 import { Icon } from './components/Icon';
-import { Sparkline } from './components/Sparkline';
+import { Chart } from './components/Chart';
 import { HealthBadge, PulseDot, StageBadge, ConnectorBadge, healthColor } from './components/Badges';
 
 // The whole point is live data; nothing here may be statically cached.
@@ -135,13 +135,26 @@ export default async function HeartbeatPage() {
               <Link
                 key={p.project.slug}
                 href={`/projects/${p.project.slug}`}
-                className="card"
-                style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}
+                className="card project-card"
+                style={{
+                  display: 'block',
+                  color: 'inherit',
+                  textDecoration: 'none',
+                  // Identity rail. Five cards of identical zeroes are otherwise
+                  // indistinguishable at a glance, which is most of what a
+                  // portfolio overview is for.
+                  ['--project-accent' as string]: p.project.accent,
+                }}
               >
                 <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
                   <div className="row" style={{ gap: 8 }}>
-                    <PulseDot health={p.health} />
+                    <Icon
+                      name={p.project.icon}
+                      size={14}
+                      className="project-icon"
+                    />
                     <strong style={{ fontSize: 14.5 }}>{p.project.name}</strong>
+                    <PulseDot health={p.health} />
                   </div>
                   <StageBadge stage={p.project.stage} />
                 </div>
@@ -198,18 +211,12 @@ export default async function HeartbeatPage() {
               </h2>
               <span className="tiny faint">{formatMoney(finance.monthToDateNetPence)} this month</span>
             </div>
-            <Sparkline
-              values={series.map((d) => d.netPence)}
-              color="var(--accent)"
-              height={56}
-              label="Net revenue over the last 30 days"
+            <Chart
+              points={series.map((d) => ({ date: d.date, value: d.netPence }))}
+              label="Net revenue"
+              height={120}
+              emptyNote="Flat at zero throughout — measured, not missing"
             />
-            <div className="row" style={{ justifyContent: 'space-between', marginTop: 6 }}>
-              <span className="tiny faint">{formatDate(series[0]?.date)}</span>
-              <span className="tiny faint">
-                {series.every((d) => d.netPence === 0) ? 'Flat at zero throughout' : 'today'}
-              </span>
-            </div>
           </div>
 
           <div className="card">

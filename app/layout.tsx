@@ -1,5 +1,34 @@
 import type { Metadata, Viewport } from 'next';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+
+/**
+ * Typography.
+ *
+ * Inter for everything, because this is a dense numeric UI and Inter was drawn
+ * for screens with real tabular figures — every digit the same width, so a
+ * column of money does not shimmer as the numbers change under the cron. The
+ * system stack it replaces varies per device, which meant the dashboard looked
+ * different on the iPad it is actually operated from than anywhere else.
+ *
+ * next/font self-hosts both faces at build time: no request to Google at
+ * runtime, no layout shift while a webfont loads, nothing for the Worker's CSP
+ * to allow.
+ */
+const sans = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-sans',
+  // Tabular figures are the whole reason for choosing this face here.
+  axes: ['opsz'],
+});
+
+const mono = JetBrains_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-mono',
+  weight: ['400', '500'],
+});
 import { Nav, type NavProject } from './components/Nav';
 import { pulse } from '@/lib/heartbeat';
 
@@ -49,7 +78,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }));
 
   return (
-    <html lang="en-GB" suppressHydrationWarning>
+    <html lang="en-GB" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>

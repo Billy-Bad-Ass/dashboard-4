@@ -202,7 +202,7 @@ export const PROJECTS: Project[] = [
     repo: 'Billy-Bad-Ass/Project-3',
     stage: 'building',
     revenueModel: 'none',
-    accent: '#C2410C',
+    accent: '#B5179E',
     icon: 'chart-line',
     startedOn: '2026-08-23',
     reality:
@@ -302,7 +302,7 @@ export const PROJECTS: Project[] = [
     repo: 'Billy-Bad-Ass/Project-5',
     stage: 'building',
     revenueModel: 'none',
-    accent: '#E6842B',
+    accent: '#C2610A',
     icon: 'tower-broadcast',
     startedOn: '2026-08-23',
     reality:
