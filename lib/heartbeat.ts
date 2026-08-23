@@ -228,7 +228,7 @@ export function assessHealth(
 }
 
 /** Resolve a project's configured vitals from whichever source each names. */
-function resolveVitals(
+export function resolveVitals(
   project: Project,
   repo: RepoPulse | null,
   finance: ProjectFinance,
@@ -244,17 +244,26 @@ function resolveVitals(
 
   for (const vital of project.vitals) {
     switch (vital.key) {
+      // The three below all used to fall back to 0, which is the one thing
+      // this codebase is built not to do. With Stripe unconfigured they wrote
+      // "$0.00 revenue, 0 units, 0% refunds" — measured-looking figures for an
+      // API that had never been contacted. `stripe` being non-null is the test:
+      // present means Stripe answered and a zero is real; absent means unknown.
       case 'revenue':
-        out[vital.key] = project.revenueModel === 'stripe' ? (stripe?.netPence ?? 0) : finance.netPence;
+        out[vital.key] =
+          project.revenueModel === 'stripe' ? (stripe?.netPence ?? null) : finance.netPence;
         break;
       case 'units':
-        out[vital.key] = stripe?.units ?? 0;
+        out[vital.key] = stripe?.units ?? null;
         break;
       case 'refund_rate':
+        // Two distinct unknowns hid behind that 0. No Stripe is one. Stripe
+        // with nothing sold yet is the other: a refund rate of 0/0 is
+        // undefined, exactly as roiPercent() is undefined on zero spend.
         out[vital.key] =
           stripe && stripe.grossPence > 0
             ? (stripe.refundedPence / stripe.grossPence) * 100
-            : 0;
+            : null;
         break;
       case 'undelivered':
         // Requires reconciling Stripe sessions against delivery, which lives in
