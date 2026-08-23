@@ -89,26 +89,83 @@ export interface AgentRun {
 }
 
 /**
- * Read through KV. On a cache miss the loader runs and the result is stored;
- * on a loader failure the stale cached value is returned if there is one,
- * because week-old traffic numbers beat an error box.
+ * How long the last-known-good copy survives. Deliberately far longer than the
+ * hot entry: its whole job is to still be there when a connector has been down
+ * for a while, because week-old traffic numbers beat an error box.
  */
-async function cached<T>(key: string, ttl: number, load: () => Promise<T>): Promise<T> {
+const STALE_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+/** KV rejects an expirationTtl below this outright. It is not a soft floor. */
+const KV_MIN_TTL_SECONDS = 60;
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** A KV read that treats an unreachable cache as a miss rather than a failure. */
+async function readJson<T>(kv: KVNamespace, key: string): Promise<T | null> {
+  try {
+    return (await kv.get(key, 'json')) as T | null;
+  } catch (error) {
+    console.error(`cache read failed for ${key}`, describe(error));
+    return null;
+  }
+}
+
+/**
+ * Read through KV, with a last-known-good fallback.
+ *
+ * Three things here were wrong for the entire life of this function, and every
+ * one of them only bit on the cron path — which is why the dashboard looked
+ * fine while nothing was being recorded:
+ *
+ *  - **`ttl === 0` meant "bypass the cache", and did the opposite.** The cron
+ *    calls `pulse({ fresh: true })` to go and actually look. The old code still
+ *    returned the cached value first, then tried to write with
+ *    `expirationTtl: 0` — which KV rejects outright, its documented minimum
+ *    being 60. So every connector on every tick threw.
+ *  - **The stale key was never written.** The fallback read `${key}:last`,
+ *    which nothing had ever put there. The stale-on-failure behaviour this
+ *    dashboard claims in three places did not exist.
+ *  - **A cache write could fail a successful load.** The `put` sat inside the
+ *    try that catches loader errors, so a KV problem discarded good data and
+ *    reported the connector as down.
+ *
+ * And the `catch {}` threw the real error away, which is why the symptom was
+ * four identical "loader failed" lines naming no cause. Errors now carry it.
+ */
+export async function cached<T>(key: string, ttl: number, load: () => Promise<T>): Promise<T> {
   const kv = getCache();
   if (!kv) return load();
 
-  const hit = await kv.get(key, 'json');
-  if (hit !== null) return hit as T;
-
-  try {
-    const fresh = await load();
-    await kv.put(key, JSON.stringify(fresh), { expirationTtl: ttl });
-    return fresh;
-  } catch {
-    const stale = await kv.get(`${key}:last`, 'json');
-    if (stale !== null) return stale as T;
-    throw new Error(`cache miss and loader failed for ${key}`);
+  // ttl 0 is the caller saying "go and look". Skip the read, not just the write.
+  if (ttl > 0) {
+    const hit = await readJson<T>(kv, key);
+    if (hit !== null) return hit;
   }
+
+  let fresh: T;
+  try {
+    fresh = await load();
+  } catch (error) {
+    const stale = await readJson<T>(kv, `${key}:last`);
+    if (stale !== null) return stale;
+    throw new Error(`cache miss and loader failed for ${key}: ${describe(error)}`);
+  }
+
+  // Caching is an optimisation. It must never turn a load that worked into a
+  // connector that reads as down, so its failures are logged and swallowed.
+  const body = JSON.stringify(fresh);
+  try {
+    if (ttl >= KV_MIN_TTL_SECONDS) {
+      await kv.put(key, body, { expirationTtl: ttl });
+    }
+    await kv.put(`${key}:last`, body, { expirationTtl: STALE_TTL_SECONDS });
+  } catch (error) {
+    console.error(`cache write failed for ${key}`, describe(error));
+  }
+
+  return fresh;
 }
 
 function health(result: ConnectorResult<unknown>, name: string): ConnectorHealth {
