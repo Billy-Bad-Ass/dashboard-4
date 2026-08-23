@@ -72,6 +72,10 @@
 
   "vars": {
     // Public, non-secret values only. Anything sensitive goes in `wrangler secret put`.
+    // Update this when a custom domain is attached (see docs/DOMAINS.md).
+    // Attaching the domain itself is done in the Cloudflare dashboard, NOT with a
+    // `routes` entry here: a route makes the deploy responsible for creating DNS
+    // records, which the deploy token has no permission to do.
     "NEXT_PUBLIC_SITE_URL": "https://bba-heartbeat.bbacentralworkspace.workers.dev",
     "GITHUB_OWNER": "Billy-Bad-Ass",
     "CALENDAR_ACCOUNT": "bbacentralworkspace@gmail.com"

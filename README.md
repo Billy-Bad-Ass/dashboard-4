@@ -62,7 +62,8 @@ npm run build && npm start   # → http://localhost:3000
 It runs with no configuration at all — every connector degrades to a clearly
 labelled "not connected" state, and `/setup` shows what is missing. See
 **[docs/RUNBOOK.md](docs/RUNBOOK.md)** for the manual sequence and
-troubleshooting.
+troubleshooting, and **[docs/DOMAINS.md](docs/DOMAINS.md)** for what to point
+`bbanetwork.org` at.
 
 ### What it costs to run
 
@@ -118,9 +119,11 @@ Four projects, registered in `config/portfolio.ts`:
   has taken no payments.
 - **Project 3.** Genuinely empty. On the dashboard so the slot stays visible
   and filling it stays a deliberate decision.
-- **Project 4 — this dashboard.** Internal tooling. It will never earn directly
-  and it costs real money to run, so its cost is counted *inside* the portfolio
-  ROI rather than hidden outside it.
+- **Project 4 — this dashboard.** Live at
+  `bba-heartbeat.bbacentralworkspace.workers.dev`, moving to
+  `heartbeat.bbanetwork.org`. Internal tooling: it will never earn directly and
+  it costs real money to run, so its cost is counted *inside* the portfolio ROI
+  rather than hidden outside it.
 
 ## Rules that are load-bearing
 
