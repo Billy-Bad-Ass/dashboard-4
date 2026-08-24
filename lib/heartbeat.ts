@@ -236,6 +236,7 @@ export function resolveVitals(
   stored: Map<string, number>,
   lastCronMinutes: number | null,
   connectorsLive: number,
+  cloudflare: CloudflareSnapshot | null = null,
 ): Record<string, number | null> {
   const out: Record<string, number | null> = {};
   const daysSinceCommit = repo?.lastCommitAt
@@ -282,6 +283,15 @@ export function resolveVitals(
         break;
       case 'connectors_live':
         out[vital.key] = connectorsLive;
+        break;
+      case 'visitors':
+        // Per-script, never the account total: two projects sharing one number
+        // would each be shown the other's traffic. A project with no Worker of
+        // its own has no answer here, and says so.
+        out[vital.key] = project.cloudflareScript
+          ? (cloudflare?.byScript.find((s) => s.script === project.cloudflareScript)?.requests ??
+            null)
+          : null;
         break;
       case 'run_cost':
         out[vital.key] = finance.spentPence;
@@ -445,6 +455,7 @@ export async function pulse(options: { fresh?: boolean } = {}): Promise<Pulse> {
         scopedStored,
         lastCronMinutes,
         connectorsLive,
+        cloudflareResult.data,
       ),
       health: verdict.health,
       healthReason: verdict.reason,

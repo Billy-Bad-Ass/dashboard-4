@@ -4,6 +4,7 @@ import { resolveVitals } from '../lib/heartbeat.ts';
 import type { Project } from '../config/portfolio.ts';
 import type { ProjectFinance } from '../lib/finance.ts';
 import type { StripeSnapshot } from '../lib/connectors/stripe.ts';
+import type { CloudflareSnapshot } from '../lib/connectors/cloudflare.ts';
 
 /**
  * The unknown-versus-zero rule, at the one place it was actually broken.
@@ -115,4 +116,62 @@ test('real Stripe figures pass through untouched', () => {
   const vitals = resolve(snapshot({ netPence: 9_400, units: 1, grossPence: 10_000 }));
   assert.equal(vitals.revenue, 9_400);
   assert.equal(vitals.units, 1);
+});
+
+
+/**
+ * The `visitors` vital, which the Cloudflare connector feeds.
+ *
+ * Before this was wired, the connector could report `ok`, hold real per-script
+ * traffic, and every visitors tile still read "—" — because nothing mapped a
+ * project to its Worker. Honest, but only by accident.
+ */
+
+function traffic(): CloudflareSnapshot {
+  return {
+    requests: 1_500,
+    errors: 3,
+    cpuMedianUs: 900,
+    byScript: [
+      { script: 'bba-network-store', requests: 1_200, errors: 2 },
+      { script: 'bba-network-hub', requests: 300, errors: 1 },
+    ],
+    windowDays: 7,
+  };
+}
+
+function siteWithScript(script?: string): Project {
+  const base = seller();
+  return {
+    ...base,
+    cloudflareScript: script,
+    vitals: [
+      { key: 'visitors', label: 'Visitors', source: 'cloudflare', unit: 'count', target: null, hint: '' },
+    ],
+  };
+}
+
+function visitorsFor(project: Project, cloudflare: CloudflareSnapshot | null) {
+  return resolveVitals(project, null, finance(), null, new Map(), null, 0, cloudflare).visitors;
+}
+
+test('visitors reads this project Worker, never the account total', () => {
+  // 1200, not 1500. Two projects on one account must not be shown each
+  // other's traffic — the same trap that made Stripe attribution per-project.
+  assert.equal(visitorsFor(siteWithScript('bba-network-store'), traffic()), 1_200);
+  assert.equal(visitorsFor(siteWithScript('bba-network-hub'), traffic()), 300);
+});
+
+test('a project with no Worker of its own reports unknown, not zero', () => {
+  assert.equal(visitorsFor(siteWithScript(undefined), traffic()), null);
+});
+
+test('a Worker with no traffic rows yet is unknown, not zero', () => {
+  // Cloudflare omits a script entirely until it has been invoked. That is
+  // "nothing reported", not "nobody visited".
+  assert.equal(visitorsFor(siteWithScript('bba-growth-os'), traffic()), null);
+});
+
+test('an unreachable Cloudflare leaves visitors unknown', () => {
+  assert.equal(visitorsFor(siteWithScript('bba-network-store'), null), null);
 });
