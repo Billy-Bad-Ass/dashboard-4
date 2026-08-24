@@ -128,6 +128,22 @@ runs:
            + (if $artifact_url == "" then {} else {artifact_url: $artifact_url} end)
            + (if $project_slug == "" then {} else {project_slug: $project_slug} end)')
 
+        # Shape-check the Access credentials before using them. Their values are
+        # masked in logs, but their LENGTH and format are not secret, and a
+        # malformed pair is indistinguishable from a wrong one at the HTTP
+        # layer — both are just a 302. Cloudflare presents these on a page that
+        # shows the whole header line, so pasting "CF-Access-Client-Id: xxx"
+        # instead of "xxx" is an easy and completely invisible mistake.
+        if [ -n "$CF_ACCESS_CLIENT_ID" ]; then
+          echo "Access client id: ${#CF_ACCESS_CLIENT_ID} chars, secret: ${#CF_ACCESS_CLIENT_SECRET} chars (expected 39 and 64)."
+          case "$CF_ACCESS_CLIENT_ID" in
+            *:*)       echo "::warning title=Access client id looks malformed::CF_ACCESS_CLIENT_ID contains a colon, so the 'CF-Access-Client-Id:' header name was probably pasted in along with the value. Store only the value." ;;
+            *" "*)     echo "::warning title=Access client id looks malformed::CF_ACCESS_CLIENT_ID contains a space." ;;
+            *.access)  echo "Client id ends in .access, as expected." ;;
+            *)         echo "::warning title=Access client id looks malformed::CF_ACCESS_CLIENT_ID does not end in .access." ;;
+          esac
+        fi
+
         ARGS=(-H 'Content-Type: application/json')
         [ -n "$DASHBOARD_TOKEN" ] && ARGS+=(-H "Authorization: Bearer $DASHBOARD_TOKEN")
         if [ -n "$CF_ACCESS_CLIENT_ID" ] && [ -n "$CF_ACCESS_CLIENT_SECRET" ]; then
@@ -135,8 +151,15 @@ runs:
           ARGS+=(-H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
         fi
 
-        CODE=$(curl -s -o /tmp/report-body -w '%{http_code}' --max-time 20 \
+        # The redirect target is captured, not just the code. A 302 from
+        # Cloudflare Access and a 302 from a redirect rule are the same status
+        # with completely different fixes, and the Location header is the only
+        # thing that tells them apart. Reporting "a redirect" without saying
+        # where to is the same failure this action exists to stop.
+        READ=$(curl -s -o /tmp/report-body -w '%{http_code} %{redirect_url}' --max-time 20 \
                  -X POST "$BASE/api/agent-runs" "${ARGS[@]}" -d "$PAYLOAD")
+        CODE="${READ%% *}"
+        REDIRECT="${READ#* }"
         [ -z "$CODE" ] && CODE=000
         echo "code=$CODE" >> "$GITHUB_OUTPUT"
 
@@ -157,7 +180,7 @@ runs:
           3*)
             # curl does not follow this and -f would not have caught it. A
             # redirect on a POST to an API is a login page, not a success.
-            echo "::warning title=Dashboard redirected the run::$CODE from $BASE/api/agent-runs. A redirect on a POST means Cloudflare Access answered instead of the Worker, and this runner holds no Access service token. Add a Service Auth policy on the application and set CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET — alongside the existing 'Only me' policy, not replacing it. The '$AGENT' run was not recorded."
+            echo "::warning title=Dashboard redirected the run::$CODE from $BASE/api/agent-runs, to: ${REDIRECT:-<no Location header>}. A cloudflareaccess.com/cdn-cgi/access URL means Access answered and this runner's service token was not accepted — check the Service Auth policy names the token whose id and secret are in CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET. Any other target means something in front of the Worker is redirecting, most likely a redirect rule on the zone, and Access is not involved at all. The '$AGENT' run was not recorded."
             ;;
           401|403)
             echo "::warning title=Dashboard refused the run::$CODE from $BASE/api/agent-runs. A 401 means DASHBOARD_TOKEN here does not match the Worker's value; a 403 usually means Access rejected the service token. The '$AGENT' run was not recorded. $BODY"
