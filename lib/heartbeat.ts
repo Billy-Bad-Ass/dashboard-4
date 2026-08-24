@@ -283,11 +283,15 @@ export function resolveVitals(
         break;
       case 'undelivered':
         // Requires reconciling Stripe sessions against delivery, which lives in
-        // Project-2. Until that job reports in, this is unknown, not zero.
+        // network-store-2. Until that job reports in, this is unknown, not zero.
         out[vital.key] = stored.get(vital.key) ?? null;
         break;
       case 'commits':
-        out[vital.key] = repo?.commitCount ?? null;
+        // `exists: false` carries commitCount 0, which is a placeholder and not
+        // a measurement. A repository the API could not read has an unknown
+        // commit count, and a tile reading "0" for a name that 404s is the
+        // exact unknown-as-zero confusion the rest of this file exists to stop.
+        out[vital.key] = repo?.exists ? repo.commitCount : null;
         break;
       case 'days_since_commit':
       case 'dataset_age_days':

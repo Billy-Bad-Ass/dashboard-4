@@ -7,7 +7,7 @@
  *    portfolio. They are defined in `.claude/agents/` and scheduled by
  *    `.github/workflows/agent-*.yml` here.
  *  - **Project agents** run out of an individual project's own repository.
- *    Project-2 already has nine of them. This dashboard does not schedule
+ *    network-store-2 already has nine of them. This dashboard does not schedule
  *    those — it shows their runs, because they report in to /api/agent-runs.
  *
  * Keeping the distinction visible matters: a scheduled job you think this repo
@@ -56,7 +56,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'portfolio-analyst',
     scope: 'portfolio',
-    repo: 'Billy-Bad-Ass/Project-4',
+    repo: 'Billy-Bad-Ass/dashboard-4',
     projectSlug: null,
     owns:
       'The Monday portfolio review. Reads the live pulse, compares against last week, and opens ' +
@@ -71,7 +71,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'spend-auditor',
     scope: 'portfolio',
-    repo: 'Billy-Bad-Ass/Project-4',
+    repo: 'Billy-Bad-Ass/dashboard-4',
     projectSlug: null,
     owns:
       'Reconciles the ledger against reality once a month: subscriptions still running that ' +
@@ -86,7 +86,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'pipeline-nudge',
     scope: 'portfolio',
-    repo: 'Billy-Bad-Ass/Project-4',
+    repo: 'Billy-Bad-Ass/dashboard-4',
     projectSlug: null,
     owns:
       'Reads the CRM for actions due and contacts going cold, and opens one issue listing them. ' +
@@ -101,7 +101,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'heartbeat-watchdog',
     scope: 'portfolio',
-    repo: 'Billy-Bad-Ass/Project-4',
+    repo: 'Billy-Bad-Ass/dashboard-4',
     projectSlug: null,
     owns:
       'Checks that the cron heartbeat is actually ticking and the connectors are live. Opens an ' +
@@ -116,7 +116,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'mention-router',
     scope: 'portfolio',
-    repo: 'Billy-Bad-Ass/Project-4',
+    repo: 'Billy-Bad-Ass/dashboard-4',
     projectSlug: null,
     owns: 'Routes an @claude mention on any issue or PR here to the right specialist.',
     schedule: null,
@@ -129,7 +129,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'revenue-analyst',
     scope: 'project',
-    repo: 'Billy-Bad-Ass/Project-2',
+    repo: 'Billy-Bad-Ass/network-store-2',
     projectSlug: 'project-2',
     owns: 'The store’s Stripe digest. Leads with problems, not the headline.',
     schedule: '0 8 * * 1',
@@ -142,7 +142,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'market-researcher',
     scope: 'project',
-    repo: 'Billy-Bad-Ass/Project-2',
+    repo: 'Billy-Bad-Ass/network-store-2',
     projectSlug: 'project-2',
     owns: 'Demand signals, competitor pricing and keyword gaps for the storefront.',
     schedule: '0 7 * * 1',
@@ -155,7 +155,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'listing-copywriter',
     scope: 'project',
-    repo: 'Billy-Bad-Ass/Project-2',
+    repo: 'Billy-Bad-Ass/network-store-2',
     projectSlug: 'project-2',
     owns: 'Monthly listing refresh — and an issue instead of a PR when copy overclaims.',
     schedule: '0 6 1 * *',
@@ -168,7 +168,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'release-qa',
     scope: 'project',
-    repo: 'Billy-Bad-Ass/Project-2',
+    repo: 'Billy-Bad-Ass/network-store-2',
     projectSlug: 'project-2',
     owns: 'Go/no-go before a store deploy. Reports, never fixes.',
     schedule: null,
@@ -181,7 +181,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'dataset-refresh',
     scope: 'project',
-    repo: 'Billy-Bad-Ass/Project-1',
+    repo: 'Billy-Bad-Ass/sitecheck-1',
     projectSlug: 'project-1',
     owns: 'Rebuilds the pSEO dataset from live APIs and redeploys.',
     schedule: '15 4 * * *',
@@ -200,7 +200,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'link-warden',
     scope: 'project',
-    repo: 'Billy-Bad-Ass/Project-6',
+    repo: 'Billy-Bad-Ass/web-6',
     projectSlug: 'project-6',
     owns:
       'Every business the register calls `live` is actually reachable. A brand hub pointing at ' +
@@ -215,7 +215,7 @@ export const AGENTS: AgentSpec[] = [
   {
     name: 'redirect-guard',
     scope: 'project',
-    repo: 'Billy-Bad-Ass/Project-6',
+    repo: 'Billy-Bad-Ass/web-6',
     projectSlug: 'project-6',
     owns:
       'The legacy apex paths that carry paying customers to their downloads. These are the only ' +

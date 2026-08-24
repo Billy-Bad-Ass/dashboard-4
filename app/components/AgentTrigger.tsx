@@ -30,11 +30,11 @@ export function AgentTrigger({ agent, workflow }: { agent: string; workflow: str
           trigger: 'manual',
           status: 'queued',
           summary: 'Queued from the dashboard — dispatch the workflow in GitHub to run it.',
-          artifact_url: `https://github.com/Billy-Bad-Ass/Project-4/actions/workflows/${workflow}`,
+          artifact_url: `https://github.com/Billy-Bad-Ass/dashboard-4/actions/workflows/${workflow}`,
         }),
       });
       window.open(
-        `https://github.com/Billy-Bad-Ass/Project-4/actions/workflows/${workflow}`,
+        `https://github.com/Billy-Bad-Ass/dashboard-4/actions/workflows/${workflow}`,
         '_blank',
         'noopener',
       );

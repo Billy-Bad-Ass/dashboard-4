@@ -63,7 +63,9 @@ It runs with no configuration at all — every connector degrades to a clearly
 labelled "not connected" state, and `/setup` shows what is missing. See
 **[docs/RUNBOOK.md](docs/RUNBOOK.md)** for the manual sequence and
 troubleshooting, and **[docs/DOMAINS.md](docs/DOMAINS.md)** for what to point
-`bbanetwork.org` at.
+`bbanetwork.org` at. **[docs/RUNBOOK-LIVE.md](docs/RUNBOOK-LIVE.md)** is the
+portfolio-wide list of what is still blocked on a credential, a DNS record or a
+decision — every item on it is human-only.
 
 ### What it costs to run
 
@@ -129,7 +131,7 @@ Four projects, registered in `config/portfolio.ts`:
 
 - **Money is integer minor units, everywhere.** `500` is $5.00. One formatter, and it
   takes pence. Getting this wrong by 100x is the classic failure here, and the
-  convention matches Project-2 deliberately.
+  convention matches network-store-2 deliberately.
 - **Never invent a number.** A connector that is unconfigured reports unknown,
   not zero. `lib/heartbeat.ts` enforces this and the UI renders the difference.
 - **Read-only on Stripe.** The dashboard never writes. Refunds and price changes

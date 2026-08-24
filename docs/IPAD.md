@@ -81,7 +81,7 @@ the right-hand panel — a long string of letters and numbers. Copy it.
 
 ### 3. Put both into GitHub
 
-[github.com/Billy-Bad-Ass/Project-4](https://github.com/Billy-Bad-Ass/Project-4)
+[github.com/Billy-Bad-Ass/dashboard-4](https://github.com/Billy-Bad-Ass/dashboard-4)
 → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**.
 
 Add two:

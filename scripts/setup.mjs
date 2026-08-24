@@ -252,7 +252,7 @@ console.log('      Cloudflare -> Zero Trust -> Access -> Applications -> Add an 
 console.log('      -> Self-hosted -> point it at your worker URL -> policy: Emails -> your address.');
 console.log(c.dim('      Free up to 50 users, on the plan you already pay for.'));
 
-console.log(`\n   ${c.bold('3.')} Let the agents report in. In Project-1, Project-2 and Project-4 on`);
+console.log(`\n   ${c.bold('3.')} Let the agents report in. In sitecheck-1, network-store-2 and dashboard-4 on`);
 console.log('      GitHub -> Settings -> Secrets and variables -> Actions, add to each:');
 console.log(c.dim('        DASHBOARD_URL       your worker URL'));
 console.log(c.dim(`        DASHBOARD_TOKEN     ${token ?? 'the value you set above'}`));
