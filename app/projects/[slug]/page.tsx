@@ -245,8 +245,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
                 <RepoRow label="Open issues" value={String(state.repo.openIssues)} />
                 <RepoRow label="Open PRs" value={String(state.repo.openPulls)} />
                 <RepoRow
-                  label="CI"
-                  value={state.repo.ciStatus ?? 'no runs'}
+                  // Named so the row cannot be mistaken for the repo's newest
+                  // run of any kind — a scheduled agent job is not this.
+                  label={`CI on ${state.repo.defaultBranch}${
+                    state.repo.ciWorkflow ? ` · ${state.repo.ciWorkflow}` : ''
+                  }`}
+                  value={state.repo.ciStatus ?? 'never pushed'}
                   tone={
                     state.repo.ciStatus === 'success'
                       ? 'good'

@@ -41,6 +41,7 @@ function repo(
     openPulls: 0,
     ciStatus,
     ciUrl: null,
+    ciWorkflow: null,
     sizeKb: 100,
     language: 'TypeScript',
     pushedAt: null,
