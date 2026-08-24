@@ -313,17 +313,21 @@ export const PROJECTS: Project[] = [
     revenueModel: 'none',
     accent: '#7C5CE6',
     icon: 'heart-pulse',
-    liveUrl: 'https://bba-heartbeat.bbacentralworkspace.workers.dev',
+    liveUrl: 'https://heartbeat.bbanetwork.org',
     startedOn: '2026-08-23',
     reality:
-      'Deployed and ticking. Internal tooling — it will never earn a penny directly, and it ' +
-      'costs real money to run. It earns its keep by making the other projects’ numbers ' +
+      'Live at heartbeat.bbanetwork.org since 2026-08-24, ticking every ten minutes, with ' +
+      'Stripe, GitHub and Cloudflare all reporting measured numbers. Internal tooling — it ' +
+      'will never earn a penny directly, and it costs real money to run. It earns its keep by making the other projects’ numbers ' +
       'impossible to avoid looking at, and it is listed here so its own running cost stays ' +
       'inside the portfolio ROI rather than hiding outside it.',
     gates: [
-      'Put Cloudflare Access in front of it — until then the URL is the only thing protecting it',
-      'Add the connector secrets so the tiles show measured numbers rather than dashes',
-      'Move it to heartbeat.bbanetwork.org and extend Access to the new hostname',
+      // Access is per-hostname. A policy on the workers.dev name does not
+      // follow the site to heartbeat.bbanetwork.org, and this page shows
+      // revenue, spend and the client list to anyone who reaches it.
+      'Confirm Cloudflare Access covers heartbeat.bbanetwork.org, not only the workers.dev name',
+      'Decide whether the workers.dev hostname stays reachable — right now it is a second door',
+      'Set CALENDAR_ICS_URL, or drop the calendar tile rather than leave it permanently grey',
     ],
     vitals: [
       {
