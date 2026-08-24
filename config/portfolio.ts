@@ -54,6 +54,16 @@ export interface Project {
     descriptors?: string[];
     products?: string[];
   };
+  /**
+   * The Cloudflare Worker this project's public traffic runs on.
+   *
+   * Without it a `cloudflare`-sourced vital has nowhere to read from: the
+   * connector returns per-script counts and nothing knows which script belongs
+   * to whom. Omit it for a project with no Worker of its own — that renders as
+   * unknown, which is the truth, rather than borrowing another project's
+   * traffic.
+   */
+  cloudflareScript?: string;
   /** ISO date the work started. Used for burn-rate and time-to-first-pound. */
   startedOn: string;
   /**
@@ -164,6 +174,7 @@ export const PROJECTS: Project[] = [
     name: 'BBA Network Store',
     tagline: 'Printable reference guides sold as digital downloads.',
     repo: 'Billy-Bad-Ass/Project-2',
+    cloudflareScript: 'bba-network-store',
     stage: 'shipped',
     revenueModel: 'stripe',
     accent: '#12A150',
@@ -193,6 +204,16 @@ export const PROJECTS: Project[] = [
         unit: 'gbp',
         target: null,
         hint: 'Net of refunds. Straight from Stripe, live mode.',
+      },
+      {
+        key: 'visitors',
+        label: 'Visitors',
+        source: 'cloudflare',
+        unit: 'count',
+        target: null,
+        hint:
+          'Requests to the storefront Worker over the last 7 days. Zero sales with zero ' +
+          'visitors is a distribution problem; zero sales with visitors is a page problem.',
       },
       {
         key: 'units',
@@ -281,6 +302,7 @@ export const PROJECTS: Project[] = [
     name: 'Heartbeat',
     tagline: 'This dashboard. The instrument panel for everything else.',
     repo: 'Billy-Bad-Ass/Project-4',
+    cloudflareScript: 'bba-heartbeat',
     stage: 'building',
     revenueModel: 'none',
     accent: '#7C5CE6',
@@ -330,6 +352,7 @@ export const PROJECTS: Project[] = [
     name: 'Growth OS',
     tagline: 'Agent-run paid ads and organic publishing, with a human approving every spend.',
     repo: 'Billy-Bad-Ass/Project-5',
+    cloudflareScript: 'bba-growth-os',
     stage: 'building',
     revenueModel: 'none',
     accent: '#C2610A',
@@ -396,6 +419,7 @@ export const PROJECTS: Project[] = [
     name: 'BBA Network Web',
     tagline: 'The public face — brand hub, storefront and audit service across subdomains.',
     repo: 'Billy-Bad-Ass/Project-6',
+    cloudflareScript: 'bba-network-hub',
     stage: 'building',
     revenueModel: 'none',
     accent: '#0E7490',
