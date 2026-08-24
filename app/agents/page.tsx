@@ -19,7 +19,11 @@ export default async function AgentsPage() {
 
   // The registry says what should run; the runs say what reported. Everything
   // interesting on this page is the gap between them.
-  const fleet = assessFleet(runs);
+  //
+  // `agentLastRuns`, not `runs` — the latter is the 25-row history table below,
+  // and a weekly agent whose one run has scrolled off it has not stopped
+  // reporting.
+  const fleet = assessFleet(snapshot.agentLastRuns);
 
   return (
     <>
@@ -41,7 +45,11 @@ export default async function AgentsPage() {
             label="Reporting"
             value={`${fleet.reporting} / ${fleet.scheduled}`}
             icon="clock"
-            foot="scheduled agents that have reported since they were last due"
+            foot={
+              fleet.due > 0
+                ? `${fleet.due} more due now, inside the grace period`
+                : 'scheduled agents that have reported since they were last due'
+            }
             accent={fleet.reporting === 0 && fleet.scheduled > 0 ? 'var(--bad)' : undefined}
           />
           {/* The tile this page was missing. An agent that should have run six
@@ -331,6 +339,7 @@ const STATE_TONE: Record<FleetState, string> = {
   overdue: 'bad',
   stalled: 'warn',
   unreadable: 'warn',
+  due: 'info',
   ok: 'good',
   unscheduled: 'neutral',
 };
@@ -340,6 +349,7 @@ const STATE_LABEL: Record<FleetState, string> = {
   overdue: 'overdue',
   stalled: 'stalled',
   unreadable: 'unreadable schedule',
+  due: 'due now',
   ok: 'reporting',
   unscheduled: 'on demand',
 };

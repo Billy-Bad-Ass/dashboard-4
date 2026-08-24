@@ -87,6 +87,17 @@ jobs:
               ;;
           esac
 
+          # A 200 carrying something that is not JSON — an Access interstitial,
+          # an HTML error page from a proxy — must not be read as "the cron has
+          # never run". That would open an issue about a healthy cron, which is
+          # the same class of mistake as the ones this workflow is fixing.
+          if ! jq -e . /tmp/pulse.json >/dev/null 2>&1; then
+            echo "verdict=error" >> "$GITHUB_OUTPUT"
+            echo "detail=$BASE/api/pulse answered $CODE but the body was not JSON, so the dashboard's own health could not be read." >> "$GITHUB_OUTPUT"
+            echo "minutes=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           MINUTES=$(jq -r '.lastCronMinutes // empty' /tmp/pulse.json)
           echo "minutes=$MINUTES" >> "$GITHUB_OUTPUT"
 

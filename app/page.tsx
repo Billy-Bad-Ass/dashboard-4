@@ -19,7 +19,8 @@ export default async function HeartbeatPage() {
   const series = await revenueSeries(30);
   const { finance, pipeline, projects, connectors } = snapshot;
   // Registered agents versus agents that actually reported. See lib/fleet.ts.
-  const fleet = assessFleet(snapshot.agentRuns);
+  // agentLastRuns, not agentRuns: the latter is a capped display window.
+  const fleet = assessFleet(snapshot.agentLastRuns);
 
   const active = projects.filter((p) => p.project.stage !== 'idea' && p.project.stage !== 'paused');
   const stalled = projects.filter((p) => p.health === 'stalled');

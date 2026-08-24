@@ -71,6 +71,12 @@ export interface Pulse {
   cloudflare: CloudflareSnapshot | null;
   events: CalendarEvent[];
   agentRuns: AgentRun[];
+  /**
+   * The most recent run for every agent that has ever reported, one row each,
+   * unbounded by the display window above. This is what lateness is computed
+   * from — see lib/fleet.ts.
+   */
+  agentLastRuns: AgentRun[];
   /** Minutes since the cron last completed. Null when it has never run. */
   lastCronMinutes: number | null;
 }
@@ -410,11 +416,28 @@ export async function pulse(options: { fresh?: boolean } = {}): Promise<Pulse> {
     safe(() => cached('calendar', ttl, () => fetchCalendar()), 'Calendar'),
   ]);
 
-  const [finance, pipeline, stored, agentRuns, lastCron] = await Promise.all([
+  const [finance, pipeline, stored, agentRuns, agentLastRuns, lastCron] = await Promise.all([
     loadFinance(),
     loadPipeline(),
     latestMetrics(),
     query<AgentRun>('SELECT * FROM agent_runs ORDER BY started_at DESC LIMIT 25'),
+    // Deliberately NOT the 25 rows above. That window is for display, and the
+    // daily reporters fill it in a few days — reading lateness from it would
+    // show a weekly agent as "never reported" the moment its one run scrolled
+    // off the end, which is the exact false alarm lib/fleet.ts exists to avoid.
+    // One row per agent, however far back it is.
+    //
+    // A plain join rather than a window function: `query()` throws on a SQL
+    // error and `pulse()` may not, so this sticks to what any SQLite accepts.
+    // Two rows come back for an agent whose latest `started_at` is tied — which
+    // agent-portfolio-review.yml produces every week, posting its `running` row
+    // and its terminal row with the identical stamp. `statusFor` sorts on
+    // (started_at, id) and takes the later insert, so the tie resolves there.
+    query<AgentRun>(
+      `SELECT r.* FROM agent_runs r
+         JOIN (SELECT agent, MAX(started_at) AS latest FROM agent_runs GROUP BY agent) m
+           ON m.agent = r.agent AND m.latest = r.started_at`,
+    ),
     query<{ checked_at: string }>(
       'SELECT checked_at FROM heartbeats ORDER BY checked_at DESC LIMIT 1',
     ),
@@ -483,6 +506,7 @@ export async function pulse(options: { fresh?: boolean } = {}): Promise<Pulse> {
     cloudflare: cloudflareResult.data,
     events,
     agentRuns,
+    agentLastRuns,
     lastCronMinutes,
   };
 }

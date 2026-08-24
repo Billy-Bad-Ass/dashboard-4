@@ -22,6 +22,8 @@ import { graceFor, nextFire, previousFire, STALLED_AFTER_MS } from './schedule';
 export type FleetState =
   /** Reported at or since its last scheduled fire. */
   | 'ok'
+  /** Its fire has passed but the grace period has not. Not late yet. */
+  | 'due'
   /** Ran before, but nothing since the fire it should have reported. */
   | 'overdue'
   /** Scheduled, and no run has ever been recorded. */
@@ -39,8 +41,9 @@ const SEVERITY: Record<FleetState, number> = {
   overdue: 1,
   stalled: 2,
   unreadable: 3,
-  ok: 4,
-  unscheduled: 5,
+  due: 4,
+  ok: 5,
+  unscheduled: 6,
 };
 
 /** States that are a finding rather than a fact. */
@@ -57,6 +60,12 @@ export interface FleetStatus {
   nextAt: Date | null;
   /** How long past its due time, in ms. Null unless overdue or never. */
   lateByMs: number | null;
+  /**
+   * How long this agent has been quiet, in ms — time since its last run, or
+   * since its missed fire when there has never been one. Null when it is not
+   * a finding. This, not severity, is what "longest silent" means.
+   */
+  silentForMs: number | null;
   /** One sentence saying what is true, for the row and the tile foot. */
   detail: string;
 }
@@ -67,6 +76,8 @@ export interface FleetSummary {
   scheduled: number;
   /** Scheduled agents that have reported since their last fire. */
   reporting: number;
+  /** Scheduled agents whose fire has passed but whose grace has not. */
+  due: number;
   /** Scheduled agents that are overdue, never-run, or stalled. */
   silent: number;
   /** Failed runs inside the recorded window. */
@@ -86,7 +97,14 @@ export function isSilent(state: FleetState): boolean {
  * first, which is the order `pulse()` and the API already return.
  */
 export function statusFor(agent: AgentSpec, runs: AgentRun[], now: Date = new Date()): FleetStatus {
-  const mine = runs.filter((run) => run.agent === agent.name);
+  // Sorted here rather than trusted from the caller. SQL tie-breaking on equal
+  // `started_at` is not defined by the query, and agent-portfolio-review.yml
+  // posts its `running` row and its terminal row with the identical stamp — so
+  // picking whichever came back first would flip a healthy weekly agent to
+  // `stalled` an hour after every successful review.
+  const mine = runs
+    .filter((run) => run.agent === agent.name)
+    .sort((a, b) => cmp(a.started_at, b.started_at) || b.id - a.id);
   const last = mine[0] ?? null;
 
   if (agent.schedule === null) {
@@ -97,6 +115,7 @@ export function statusFor(agent: AgentSpec, runs: AgentRun[], now: Date = new Da
       dueAt: null,
       nextAt: null,
       lateByMs: null,
+      silentForMs: null,
       detail: last
         ? 'Event-triggered. It has fired before.'
         : 'Event-triggered — nothing to be late for.',
@@ -114,6 +133,7 @@ export function statusFor(agent: AgentSpec, runs: AgentRun[], now: Date = new Da
       dueAt: null,
       nextAt,
       lateByMs: null,
+      silentForMs: null,
       detail: `The registered schedule \`${agent.schedule}\` could not be read, so this agent cannot be checked for lateness.`,
     };
   }
@@ -140,7 +160,26 @@ export function statusFor(agent: AgentSpec, runs: AgentRun[], now: Date = new Da
         dueAt,
         nextAt,
         lateByMs: null,
+        silentForMs: now.getTime() - new Date(last.started_at).getTime(),
         detail: `A run posted \`${last.status}\` and never posted a finish. It is not running — nothing has closed it out.`,
+      };
+    }
+
+    // Inside the grace window but nothing has reported for THIS fire yet. It is
+    // not late, and it is also not evidence that anything is working, so it
+    // does not count towards "reporting" — that tile going up on the strength
+    // of a fire that has not been answered would be the same false comfort
+    // this module exists to remove.
+    if (!reportedSinceDue) {
+      return {
+        agent,
+        state: 'due',
+        last,
+        dueAt,
+        nextAt,
+        lateByMs: null,
+        silentForMs: null,
+        detail: `Due at ${iso(dueAt)} and not reported yet — still inside the grace period, so not late.`,
       };
     }
 
@@ -151,9 +190,8 @@ export function statusFor(agent: AgentSpec, runs: AgentRun[], now: Date = new Da
       dueAt,
       nextAt,
       lateByMs: null,
-      detail: last
-        ? `Reported since its last scheduled fire.`
-        : `Due now — inside the grace period, so not yet late.`,
+      silentForMs: null,
+      detail: 'Reported since its last scheduled fire.',
     };
   }
 
@@ -166,11 +204,17 @@ export function statusFor(agent: AgentSpec, runs: AgentRun[], now: Date = new Da
     dueAt,
     nextAt,
     lateByMs,
+    silentForMs:
+      last === null ? lateByMs : now.getTime() - new Date(last.started_at).getTime(),
     detail:
       state === 'never'
         ? `${agent.scheduleHuman}, and no run has ever been recorded. The schedule last fired at ${iso(dueAt)}.`
         : `Silent since its last run. It should have reported at ${iso(dueAt)}.`,
   };
+}
+
+function cmp(a: string, b: string): number {
+  return a < b ? 1 : a > b ? -1 : 0;
 }
 
 /** The whole fleet, worst first. */
@@ -189,13 +233,19 @@ export function assessFleet(
   const scheduled = statuses.filter((s) => s.agent.schedule !== null);
   const silent = scheduled.filter((s) => isSilent(s.state));
 
+  // `statuses` is sorted by severity for display. "Longest silent" is a
+  // different question and needs its own ordering, or a two-hour `never`
+  // outranks a six-day `overdue` and the headline quotes the shorter silence.
+  const longest = [...silent].sort((a, b) => (b.silentForMs ?? 0) - (a.silentForMs ?? 0));
+
   return {
     statuses,
     scheduled: scheduled.length,
     reporting: scheduled.filter((s) => s.state === 'ok').length,
+    due: scheduled.filter((s) => s.state === 'due').length,
     silent: silent.length,
     failures: runs.filter((run) => run.status === 'failed').length,
-    worst: silent[0] ?? null,
+    worst: longest[0] ?? null,
   };
 }
 

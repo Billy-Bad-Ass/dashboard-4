@@ -192,9 +192,11 @@ test('an agent that used to report and went quiet is overdue, not never', () => 
 });
 
 test('a fire inside the grace period is not yet late', () => {
-  // 12:30 fire, checked at 13:00 — half an hour in, grace is an hour.
+  // 12:30 fire, checked at 13:00 — half an hour in, grace is an hour. `due`
+  // rather than `ok`: not late, but not evidence anything is working either.
   const status = statusFor(agent(), [], at('2026-08-24T13:00:00Z'));
-  assert.equal(status.state, 'ok');
+  assert.equal(status.state, 'due');
+  assert.equal(isSilent(status.state), false);
 });
 
 test('a start with no finish is stalled, not running', () => {
@@ -214,7 +216,9 @@ test('a queued run posted minutes ago is still in flight', () => {
     [run({ status: 'queued', finished_at: null, started_at: '2026-08-24T14:20:00Z' })],
     NOW,
   );
+  // It reported for the 12:30 fire, so it is reporting — just not finished.
   assert.equal(status.state, 'ok');
+  assert.equal(isSilent(status.state), false);
 });
 
 test('an event-triggered agent is never overdue', () => {
@@ -284,4 +288,59 @@ test('every registered agent has somewhere to be looked at', () => {
       assert.ok(!spec.workflow.endsWith('.yml'), `${spec.name} is not a workflow file`);
     }
   }
+});
+
+// ---------------------------------------------- regressions found in review ---
+
+test('a run older than the display window still counts as reporting', () => {
+  // pulse() returns only the last 25 runs for the history table. Reading
+  // lateness from that window showed a weekly agent as "never reported" as
+  // soon as the daily reporters pushed its one run off the end. assessFleet is
+  // fed the unbounded last-run-per-agent set instead; this pins the behaviour
+  // it depends on — an old run is still a run.
+  const status = statusFor(
+    agent({ schedule: '0 7 * * 1' }),
+    [run({ started_at: '2026-08-24T07:05:00Z' })],
+    at('2026-08-28T12:00:00Z'),
+  );
+  assert.equal(status.state, 'ok');
+});
+
+test('a running row and its terminal row sharing a stamp resolve to the terminal one', () => {
+  // agent-portfolio-review.yml posts both with the same started_at. If the
+  // `running` row wins, a healthy weekly agent flips to `stalled` an hour
+  // after every successful review and stays there all week.
+  const stamp = '2026-08-24T07:00:00Z';
+  const rows = [
+    run({ id: 10, status: 'running', started_at: stamp, finished_at: null, duration_ms: null }),
+    run({ id: 11, status: 'ok', started_at: stamp }),
+  ];
+  for (const order of [rows, [...rows].reverse()]) {
+    const status = statusFor(agent({ schedule: '0 7 * * 1' }), order, at('2026-08-24T14:00:00Z'));
+    assert.equal(status.state, 'ok');
+    assert.equal(status.last?.id, 11);
+  }
+});
+
+test('inside the grace window, an unanswered fire is "due" and not counted as reporting', () => {
+  // The tile must not go up on the strength of a fire nothing has answered.
+  const summary = assessFleet([], at('2026-08-24T13:00:00Z'), [agent()]);
+  assert.equal(summary.statuses[0]?.state, 'due');
+  assert.equal(summary.reporting, 0, 'nothing has reported for this fire');
+  assert.equal(summary.due, 1);
+  assert.equal(summary.silent, 0, 'not late either — the grace period holds');
+  assert.match(summary.statuses[0]?.detail ?? '', /not reported yet/);
+});
+
+test('"longest silent" is the longest silence, not the worst severity', () => {
+  // Severity sorts `never` above `overdue` for display. The headline asks a
+  // different question, and a 2-hour never must not outrank a 6-day overdue.
+  const summary = assessFleet(
+    [run({ agent: 'long-gone', started_at: '2026-08-18T12:31:00Z' })],
+    NOW,
+    [agent({ name: 'fresh-never' }), agent({ name: 'long-gone' })],
+  );
+  assert.equal(summary.statuses[0]?.agent.name, 'fresh-never', 'display is severity-first');
+  assert.equal(summary.worst?.agent.name, 'long-gone', 'headline is duration-first');
+  assert.ok((summary.worst?.silentForMs ?? 0) > 5 * 86_400_000);
 });
