@@ -119,9 +119,9 @@ Four projects, registered in `config/portfolio.ts`:
   has taken no payments.
 - **Project 3.** Genuinely empty. On the dashboard so the slot stays visible
   and filling it stays a deliberate decision.
-- **Project 4 — this dashboard.** Live at
-  `bba-heartbeat.bbacentralworkspace.workers.dev`, moving to
-  `heartbeat.bbanetwork.org`. Internal tooling: it will never earn directly and
+- **Project 4 — this dashboard.** Live at `heartbeat.bbanetwork.org`. The
+  `bba-heartbeat.bbacentralworkspace.workers.dev` name still resolves, so
+  Cloudflare Access has to cover both or neither. Internal tooling: it will never earn directly and
   it costs real money to run, so its cost is counted *inside* the portfolio ROI
   rather than hidden outside it.
 
