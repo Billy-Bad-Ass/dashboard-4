@@ -255,12 +255,18 @@ export const PROJECTS: Project[] = [
     startedOn: '2026-08-23',
     reality:
       'Research, not a trading system. Nothing in the repository can place an order, send, ' +
-      'publish or spend — that is structural rather than policy. Its hosting is UNCLEAR and this ' +
-      'entry will not guess: it was recorded as having moved off Cloudflare on 2026-08-21, with ' +
-      'the D1 database and both Workers deleted in favour of GitHub Actions and a ' +
-      'D1-over-node:sqlite adapter — but bba-trading-runner and bba-trading-watchman were ' +
-      'created on the account again on 2026-08-23. Both statements cannot be current. Ask ' +
-      'before relying on either. Its revenue model is deliberately ' +
+      'publish or spend — verified in the repository, not taken on trust: no broker, no ' +
+      'credential, no account, and a watchman check that flags any live trade lacking a risk ' +
+      'PASS. Topstep also bars remote servers from placing orders in its own terms, so on that ' +
+      'venue the block is the counterparty\'s as well as ours. It is back on Cloudflare as of ' +
+      '2026-08-23 — bba-trading-runner and bba-trading-watchman, both with a wrangler.toml and ' +
+      'a deploy-workers workflow. The earlier "moved off on 2026-08-21" note is superseded. ' +
+      '🔴 As of 2026-08-23 it has NO SURVIVING STRATEGY: both engines triggered on a close ' +
+      'beyond a level and then filled AT that level, buying the wick with the close\'s ' +
+      'hindsight. Fair fills killed the reversal outright (+2.82 to -6.92 points a trade) and ' +
+      'dropped ORB from +10.68 to +3.03, failing three gates. That is the system working. The ' +
+      'only unrefuted variant is a limit-order fill model that has not been built. Its ' +
+      'revenue model is deliberately ' +
       '"none" — a strategy that has not survived honest testing is a liability, not an asset, ' +
       'and putting a revenue tile on it would invite exactly the impatience it is built against.',
     gates: [
