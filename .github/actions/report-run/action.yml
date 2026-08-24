@@ -135,8 +135,15 @@ runs:
           ARGS+=(-H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
         fi
 
-        CODE=$(curl -s -o /tmp/report-body -w '%{http_code}' --max-time 20 \
+        # The redirect target is captured, not just the code. A 302 from
+        # Cloudflare Access and a 302 from a redirect rule are the same status
+        # with completely different fixes, and the Location header is the only
+        # thing that tells them apart. Reporting "a redirect" without saying
+        # where to is the same failure this action exists to stop.
+        READ=$(curl -s -o /tmp/report-body -w '%{http_code} %{redirect_url}' --max-time 20 \
                  -X POST "$BASE/api/agent-runs" "${ARGS[@]}" -d "$PAYLOAD")
+        CODE="${READ%% *}"
+        REDIRECT="${READ#* }"
         [ -z "$CODE" ] && CODE=000
         echo "code=$CODE" >> "$GITHUB_OUTPUT"
 
@@ -157,7 +164,7 @@ runs:
           3*)
             # curl does not follow this and -f would not have caught it. A
             # redirect on a POST to an API is a login page, not a success.
-            echo "::warning title=Dashboard redirected the run::$CODE from $BASE/api/agent-runs. A redirect on a POST means Cloudflare Access answered instead of the Worker, and this runner holds no Access service token. Add a Service Auth policy on the application and set CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET — alongside the existing 'Only me' policy, not replacing it. The '$AGENT' run was not recorded."
+            echo "::warning title=Dashboard redirected the run::$CODE from $BASE/api/agent-runs, to: ${REDIRECT:-<no Location header>}. A cloudflareaccess.com/cdn-cgi/access URL means Access answered and this runner's service token was not accepted — check the Service Auth policy names the token whose id and secret are in CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET. Any other target means something in front of the Worker is redirecting, most likely a redirect rule on the zone, and Access is not involved at all. The '$AGENT' run was not recorded."
             ;;
           401|403)
             echo "::warning title=Dashboard refused the run::$CODE from $BASE/api/agent-runs. A 401 means DASHBOARD_TOKEN here does not match the Worker's value; a 403 usually means Access rejected the service token. The '$AGENT' run was not recorded. $BODY"

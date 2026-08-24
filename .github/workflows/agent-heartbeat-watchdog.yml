@@ -61,9 +61,14 @@ jobs:
             ARGS+=(-H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
           fi
 
-          CODE=$(curl -s -o /tmp/pulse.json -w '%{http_code}' --max-time 20 "${ARGS[@]}" "$BASE/api/pulse")
+          # Capture where a redirect points, not just that there was one: an
+          # Access login page and a zone redirect rule are the same 302 with
+          # different fixes.
+          READ=$(curl -s -o /tmp/pulse.json -w '%{http_code} %{redirect_url}' --max-time 20 "${ARGS[@]}" "$BASE/api/pulse")
+          CODE="${READ%% *}"
+          REDIRECT="${READ#* }"
           [ -z "$CODE" ] && CODE=000
-          echo "Probe of $BASE/api/pulse answered $CODE."
+          echo "Probe of $BASE/api/pulse answered $CODE${REDIRECT:+, redirecting to $REDIRECT}."
 
           case "$CODE" in
             2*) ;;
@@ -75,7 +80,7 @@ jobs:
               ;;
             3*|401|403)
               echo "verdict=blocked" >> "$GITHUB_OUTPUT"
-              echo "detail=$BASE/api/pulse answered $CODE — Cloudflare Access answered instead of the Worker, and this runner holds no Access service token. This says nothing about whether the dashboard is healthy." >> "$GITHUB_OUTPUT"
+              echo "detail=$BASE/api/pulse answered $CODE, redirecting to ${REDIRECT:-<no Location header>}. A cdn-cgi/access target means Cloudflare Access rejected this runner's service token; any other target means something in front of the Worker is redirecting and Access is not involved. Either way this says nothing about whether the dashboard is healthy." >> "$GITHUB_OUTPUT"
               echo "minutes=" >> "$GITHUB_OUTPUT"
               exit 0
               ;;
