@@ -200,9 +200,18 @@ export function assessHealth(
     return { health: 'watch', reason: 'Repository not readable — check the token or the name.' };
   }
 
+  // repo.lastCommitAt is the last commit BY A PERSON. That distinction is the
+  // whole point of this check: a project with a cron committing state every few
+  // hours would otherwise reset its own clock forever and could never be
+  // reported stalled, however long ago its author walked away.
   const daysSinceCommit = repo.lastCommitAt
     ? Math.floor((Date.now() - new Date(repo.lastCommitAt).getTime()) / 86_400_000)
     : null;
+
+  // Said out loud wherever a verdict is given, because "no commits for 40 days"
+  // on a repository a bot touched an hour ago reads as a broken check.
+  const automated =
+    repo.botCommitCount > 0 ? ` Its automation is still running (${repo.botCommitCount} commits).` : '';
 
   if (repo.ciStatus === 'failure') {
     return { health: 'stalled', reason: 'CI is red on the default branch.' };
@@ -211,9 +220,9 @@ export function assessHealth(
     return {
       health: 'stalled',
       reason:
-        daysSinceCommit === null
-          ? 'No commits in the last 30 days.'
-          : `No commits for ${daysSinceCommit} days.`,
+        (daysSinceCommit === null
+          ? 'Nobody has committed in the last 30 days.'
+          : `Nobody has committed for ${daysSinceCommit} days.`) + automated,
     };
   }
   // Earning projects are held to a harder standard: money in means the thing
@@ -222,9 +231,9 @@ export function assessHealth(
     return { health: 'watch', reason: 'Marked as earning but net revenue is not positive.' };
   }
   if (daysSinceCommit > 7) {
-    return { health: 'watch', reason: `Last commit ${daysSinceCommit} days ago.` };
+    return { health: 'watch', reason: `Last commit by a person ${daysSinceCommit} days ago.${automated}` };
   }
-  return { health: 'good', reason: `Active — last commit ${daysSinceCommit} days ago.` };
+  return { health: 'good', reason: `Active — last commit by a person ${daysSinceCommit} days ago.` };
 }
 
 /** Resolve a project's configured vitals from whichever source each names. */

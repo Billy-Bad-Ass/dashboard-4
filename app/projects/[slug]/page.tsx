@@ -223,11 +223,25 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
             </div>
             {state.repo && state.repo.exists ? (
               <div className="stack" style={{ gap: 10 }}>
-                <RepoRow label="Commits (30d)" value={String(state.repo.commitCount)} />
+                {/* Labelled "by a person" because these two numbers were one
+                    number until a cron made the distinction load-bearing. */}
+                <RepoRow label="Commits (30d, by a person)" value={String(state.repo.commitCount)} />
+                {state.repo.botCommitCount > 0 ? (
+                  <RepoRow
+                    label="Automated commits (30d)"
+                    value={String(state.repo.botCommitCount)}
+                  />
+                ) : null}
                 <RepoRow
-                  label="Last commit"
+                  label="Last commit by a person"
                   value={state.repo.lastCommitAt ? relativeTime(state.repo.lastCommitAt) : 'never'}
                 />
+                {state.repo.botCommitCount > 0 && state.repo.lastAnyCommitAt ? (
+                  <RepoRow
+                    label="Last automated commit"
+                    value={relativeTime(state.repo.lastAnyCommitAt)}
+                  />
+                ) : null}
                 <RepoRow label="Open issues" value={String(state.repo.openIssues)} />
                 <RepoRow label="Open PRs" value={String(state.repo.openPulls)} />
                 <RepoRow
