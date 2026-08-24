@@ -35,24 +35,37 @@ jobs:
 
       - run: npm ci
 
+      - id: start
+        run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Tell the dashboard a run started
-        id: start
-        # `|| true` throughout the reporting steps: the dashboard being down
-        # must not fail the agent run. Losing the log entry is a smaller problem
-        # than losing the review.
-        run: |
-          echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-          curl -sf -X POST "$DASHBOARD_URL/api/agent-runs" \
-            -H "Authorization: Bearer $DASHBOARD_TOKEN" \
-            -H 'Content-Type: application/json' \
-            -d '{"agent":"portfolio-analyst","trigger":"cron","status":"running",
-                 "summary":"Weekly portfolio review started."}' || true
-        env:
-          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
-          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+        # A reporting problem must not fail the agent run — losing the log
+        # entry is a smaller problem than losing the review. It must also not
+        # look like it worked, which is what the old `curl ... || true` got
+        # wrong. See .github/actions/report-run.
+        uses: ./.github/actions/report-run
+        with:
+          agent: portfolio-analyst
+          trigger: ${{ github.event_name == 'schedule' && 'cron' || 'manual' }}
+          status: running
+          started_at: ${{ steps.start.outputs.started }}
+          summary: Weekly portfolio review started.
+          artifact_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          dashboard_url: ${{ secrets.DASHBOARD_URL }}
+          dashboard_token: ${{ secrets.DASHBOARD_TOKEN }}
+          access_client_id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          access_client_secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+
+      - name: Is an investigator configured?
+        id: investigator
+        uses: ./.github/actions/investigator
+        with:
+          oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Produce the review
         id: review
+        if: steps.investigator.outputs.ready == 'true'
         uses: anthropics/claude-code-action@v1
         with:
           # Prefer the Claude subscription token when it is set: on a Max plan
@@ -79,24 +92,34 @@ jobs:
         env:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
 
+      - name: Say why there is no review this week
+        if: always() && steps.investigator.outputs.ready != 'true'
+        run: |
+          echo "::warning title=No portfolio review produced::No CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY is set, so no review was written and no issue was opened. The week starts with no portfolio-level read."
+
       - name: Report the outcome
         if: always()
-        run: |
-          STATUS=ok
-          [ "${{ steps.review.outcome }}" = "failure" ] && STATUS=failed
-          curl -sf -X POST "$DASHBOARD_URL/api/agent-runs" \
-            -H "Authorization: Bearer $DASHBOARD_TOKEN" \
-            -H 'Content-Type: application/json' \
-            -d "{\"agent\":\"portfolio-analyst\",\"trigger\":\"cron\",\"status\":\"$STATUS\",
-                 \"started_at\":\"${{ steps.start.outputs.started }}\",
-                 \"summary\":\"Weekly portfolio review.\",
-                 \"artifact_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true
-        env:
-          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
-          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+        uses: ./.github/actions/report-run
+        with:
+          agent: portfolio-analyst
+          trigger: ${{ github.event_name == 'schedule' && 'cron' || 'manual' }}
+          started_at: ${{ steps.start.outputs.started }}
+          status: >-
+            ${{ steps.review.outcome == 'failure' && 'failed'
+            || steps.investigator.outputs.ready != 'true' && 'skipped'
+            || 'ok' }}
+          summary: >-
+            ${{ steps.investigator.outputs.ready == 'true'
+            && 'Weekly portfolio review.'
+            || 'Skipped: no Claude credential is configured, so no review was produced.' }}
+          artifact_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          dashboard_url: ${{ secrets.DASHBOARD_URL }}
+          dashboard_token: ${{ secrets.DASHBOARD_TOKEN }}
+          access_client_id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          access_client_secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 
       - name: Commit the report
-        if: success()
+        if: steps.review.outcome == 'success'
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'

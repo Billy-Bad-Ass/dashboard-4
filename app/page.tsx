@@ -9,6 +9,7 @@ import { Tile } from './components/Tile';
 import { Icon } from './components/Icon';
 import { Chart } from './components/Chart';
 import { HealthBadge, PulseDot, StageBadge, ConnectorBadge, healthColor } from './components/Badges';
+import { assessFleet } from '@/lib/fleet';
 
 // The whole point is live data; nothing here may be statically cached.
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,8 @@ export default async function HeartbeatPage() {
   const snapshot = await pulse();
   const series = await revenueSeries(30);
   const { finance, pipeline, projects, connectors } = snapshot;
+  // Registered agents versus agents that actually reported. See lib/fleet.ts.
+  const fleet = assessFleet(snapshot.agentRuns);
 
   const active = projects.filter((p) => p.project.stage !== 'idea' && p.project.stage !== 'paused');
   const stalled = projects.filter((p) => p.health === 'stalled');
@@ -264,6 +267,31 @@ export default async function HeartbeatPage() {
                 All runs <Icon name="arrow-right" size={10} />
               </Link>
             </div>
+            {fleet.silent > 0 ? (
+              // Not an empty state. An agent that missed its schedule is a
+              // finding, and burying it under "nothing here yet" is how seven
+              // silent agents went unnoticed for as long as they did.
+              <div className="notice notice-warn" style={{ marginBottom: 10 }}>
+                <Icon name="triangle-exclamation" size={15} />
+                <div>
+                  <strong>
+                    {fleet.silent} of {fleet.scheduled} scheduled agents{' '}
+                    {fleet.silent === 1 ? 'has' : 'have'} not reported on time.
+                  </strong>
+                  <div className="tiny muted" style={{ marginTop: 3 }}>
+                    {fleet.worst ? (
+                      <>
+                        Longest silent: <span className="mono">{fleet.worst.agent.name}</span>
+                        {fleet.worst.dueAt
+                          ? `, due ${relativeTime(fleet.worst.dueAt.toISOString())}`
+                          : ''}
+                        . <Link href="/agents">See the fleet</Link>.
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {snapshot.agentRuns.length === 0 ? (
               <div className="empty">
                 <strong>No agent runs recorded.</strong>

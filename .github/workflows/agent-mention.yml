@@ -32,7 +32,19 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - uses: anthropics/claude-code-action@v1
+      - id: start
+        run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Is an investigator configured?
+        id: investigator
+        uses: ./.github/actions/investigator
+        with:
+          oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - id: route
+        if: steps.investigator.outputs.ready == 'true'
+        uses: anthropics/claude-code-action@v1
         with:
           # Prefer the Claude subscription token when it is set: on a Max plan
           # these runs cost nothing, where an API key bills per token. The
@@ -58,3 +70,44 @@ jobs:
             --allowed-tools Read,Write,Edit,Bash,Grep,Glob,WebFetch,Agent,Workflow
         env:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+
+      - name: Say so on the thread when nothing can answer
+        # Unlike the scheduled agents, there is a person waiting here. A red run
+        # in the Actions tab is not an answer they will ever see, so the fact
+        # that nobody is coming goes back on the thread they asked in.
+        if: always() && steps.investigator.outputs.ready != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          set +e
+          echo "::warning title=Mention unanswered::No CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY is set, so the @claude mention was not routed to anybody."
+          [ -z "$ISSUE_NUMBER" ] && exit 0
+          BODY='No `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` is set on this repository, so nothing was able to pick this up. Add one under **Settings → Secrets and variables → Actions** and mention `@claude` again.'
+          curl -s -o /dev/null -w 'Comment POST: %{http_code}\n' \
+            -X POST "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/comments" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -d "$(jq -nc --arg body "$BODY" '{body:$body}')"
+          exit 0
+
+      - name: Report the outcome
+        if: always()
+        uses: ./.github/actions/report-run
+        with:
+          agent: mention-router
+          trigger: github
+          started_at: ${{ steps.start.outputs.started }}
+          status: >-
+            ${{ steps.route.outcome == 'failure' && 'failed'
+            || steps.investigator.outputs.ready != 'true' && 'skipped'
+            || 'ok' }}
+          summary: >-
+            ${{ steps.investigator.outputs.ready == 'true'
+            && 'Routed an @claude mention.'
+            || 'Skipped: no Claude credential is configured, so the mention went unanswered.' }}
+          artifact_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          dashboard_url: ${{ secrets.DASHBOARD_URL }}
+          dashboard_token: ${{ secrets.DASHBOARD_TOKEN }}
+          access_client_id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          access_client_secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}

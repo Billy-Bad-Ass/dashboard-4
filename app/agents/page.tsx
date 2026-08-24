@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { pulse } from '@/lib/heartbeat';
 import { AGENTS } from '@/config/agents';
 import { PROJECTS } from '@/config/portfolio';
+import { assessFleet, isSilent, type FleetState, type FleetStatus } from '@/lib/fleet';
 import { relativeTime, formatDate } from '@/lib/dates';
 import { PageHead } from '@/app/components/PageHead';
 import { Tile } from '@/app/components/Tile';
@@ -16,13 +17,9 @@ export default async function AgentsPage() {
   const snapshot = await pulse();
   const runs = snapshot.agentRuns;
 
-  const lastByAgent = new Map<string, (typeof runs)[number]>();
-  for (const run of runs) {
-    if (!lastByAgent.has(run.agent)) lastByAgent.set(run.agent, run);
-  }
-
-  const scheduled = AGENTS.filter((a) => a.schedule !== null);
-  const failures = runs.filter((r) => r.status === 'failed').length;
+  // The registry says what should run; the runs say what reported. Everything
+  // interesting on this page is the gap between them.
+  const fleet = assessFleet(runs);
 
   return (
     <>
@@ -41,43 +38,73 @@ export default async function AgentsPage() {
             foot={`${AGENTS.filter((a) => a.scope === 'portfolio').length} portfolio-wide, ${AGENTS.filter((a) => a.scope === 'project').length} inside projects`}
           />
           <Tile
-            label="On a schedule"
-            value={String(scheduled.length)}
+            label="Reporting"
+            value={`${fleet.reporting} / ${fleet.scheduled}`}
             icon="clock"
-            foot={`${AGENTS.length - scheduled.length} event-triggered`}
+            foot="scheduled agents that have reported since they were last due"
+            accent={fleet.reporting === 0 && fleet.scheduled > 0 ? 'var(--bad)' : undefined}
           />
+          {/* The tile this page was missing. An agent that should have run six
+              hours ago and has not is a finding, and it used to render as a
+              dash in a column. */}
           <Tile
-            label="Runs recorded"
-            value={String(runs.length)}
-            icon="list-check"
+            label="Not heard from"
+            value={String(fleet.silent)}
+            icon="signal"
+            higherIsBetter={false}
+            accent={fleet.silent > 0 ? 'var(--bad)' : undefined}
             foot={
-              runs.length === 0
-                ? 'Nothing has reported in yet.'
-                : `most recent ${relativeTime(runs[0]?.started_at)}`
+              fleet.worst
+                ? `longest silent: ${fleet.worst.agent.name}${
+                    fleet.worst.dueAt ? `, due ${relativeTime(fleet.worst.dueAt.toISOString())}` : ''
+                  }`
+                : 'Every scheduled agent has checked in.'
             }
           />
           <Tile
             label="Failures"
-            value={String(failures)}
+            value={String(fleet.failures)}
             icon="circle-exclamation"
-            foot={failures === 0 ? 'Nothing failing.' : 'In the last 25 recorded runs.'}
             higherIsBetter={false}
-            accent={failures > 0 ? 'var(--bad)' : undefined}
+            accent={fleet.failures > 0 ? 'var(--bad)' : undefined}
+            foot={
+              runs.length === 0
+                ? 'No runs recorded at all — which is not the same as nothing failing.'
+                : fleet.failures === 0
+                  ? `None in the last ${runs.length} recorded runs.`
+                  : `In the last ${runs.length} recorded runs.`
+            }
           />
         </div>
 
-        {runs.length === 0 ? (
-          <div className="notice notice-info">
-            <Icon name="circle-nodes" size={16} />
+        {/* The headline. Silence used to be the absence of a row; now it is a
+            row of its own, because a dashboard that cannot tell "everything is
+            fine" from "nobody has said anything" will say everything is fine
+            right up until it matters. */}
+        {fleet.silent > 0 ? (
+          <div className="notice notice-warn">
+            <Icon name="triangle-exclamation" size={16} />
             <div>
-              <strong>No agent has reported in yet.</strong>
-              <div className="small muted" style={{ marginTop: 3 }}>
-                The workflows below exist and are scheduled, but this console only shows runs that
-                POST to <span className="mono">/api/agent-runs</span>. Set{' '}
-                <span className="mono">DASHBOARD_URL</span> and{' '}
-                <span className="mono">DASHBOARD_TOKEN</span> as repository secrets and the reporting
-                step in each workflow starts landing here. See{' '}
-                <Link href="/setup">setup</Link>.
+              <strong>
+                {fleet.silent} of {fleet.scheduled} scheduled agents{' '}
+                {fleet.silent === 1 ? 'has' : 'have'} not reported when they should have.
+              </strong>
+              <div className="small muted" style={{ marginTop: 5 }}>
+                {fleet.statuses
+                  .filter((s) => isSilent(s.state))
+                  .map((s) => (
+                    <div key={s.agent.name} style={{ marginTop: 3 }}>
+                      <span className="mono">{s.agent.name}</span> — {s.detail}
+                    </div>
+                  ))}
+              </div>
+              <div className="tiny faint" style={{ marginTop: 8 }}>
+                A run only lands here if it POSTs to <span className="mono">/api/agent-runs</span>,
+                so check <span className="mono">DASHBOARD_URL</span> and{' '}
+                <span className="mono">DASHBOARD_TOKEN</span> are set as repository secrets before
+                concluding the agent itself is broken — see <Link href="/setup">setup</Link>. That
+                the workflow ran is not evidence it reported, and a failed run reports nothing at
+                all.
               </div>
             </div>
           </div>
@@ -90,7 +117,7 @@ export default async function AgentsPage() {
               <Icon name="circle-nodes" size={13} />
               The fleet
             </h2>
-            <span className="tiny faint">portfolio agents run from this repository</span>
+            <span className="tiny faint">worst first</span>
           </div>
           <div className="table-wrap">
             <table>
@@ -98,72 +125,16 @@ export default async function AgentsPage() {
                 <tr>
                   <th>Agent</th>
                   <th>Owns</th>
-                  <th>Runs</th>
+                  <th>Schedule</th>
+                  <th>State</th>
                   <th>Last run</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {AGENTS.map((agent) => {
-                  const last = lastByAgent.get(agent.name);
-                  const project = PROJECTS.find((p) => p.slug === agent.projectSlug);
-                  return (
-                    <tr key={`${agent.repo}:${agent.name}`}>
-                      <td>
-                        <div className="row" style={{ gap: 7 }}>
-                          <Icon name={agent.icon} size={13} />
-                          <strong style={{ fontSize: 13.5 }}>{agent.name}</strong>
-                        </div>
-                        <div className="tiny faint" style={{ marginTop: 2 }}>
-                          {project ? (
-                            <Link href={`/projects/${project.slug}`}>{project.name}</Link>
-                          ) : (
-                            'Portfolio'
-                          )}
-                          {' · '}
-                          <span className="mono">{agent.workflow}</span>
-                        </div>
-                      </td>
-                      <td className="small muted" style={{ maxWidth: 340 }}>
-                        {agent.owns}
-                      </td>
-                      <td className="tiny">
-                        <span className={`badge badge-${agent.schedule ? 'info' : 'neutral'}`}>
-                          {agent.scheduleHuman}
-                        </span>
-                      </td>
-                      <td className="tiny">
-                        {last ? (
-                          <>
-                            <span className={`badge badge-${runTone(last.status)}`}>
-                              {last.status}
-                            </span>
-                            <div className="faint" style={{ marginTop: 2 }}>
-                              {relativeTime(last.started_at)}
-                            </div>
-                          </>
-                        ) : (
-                          <span className="faint">never</span>
-                        )}
-                      </td>
-                      <td>
-                        {agent.scope === 'portfolio' && agent.trigger === 'cron' ? (
-                          <AgentTrigger agent={agent.name} workflow={agent.workflow} />
-                        ) : (
-                          <a
-                            className="btn btn-sm"
-                            href={`https://github.com/${agent.repo}/actions/workflows/${agent.workflow}`}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            title="Open in GitHub Actions"
-                          >
-                            <Icon name="arrow-up-right-from-square" size={11} />
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {fleet.statuses.map((status) => (
+                  <FleetRow key={`${status.agent.repo}:${status.agent.name}`} status={status} />
+                ))}
               </tbody>
             </table>
           </div>
@@ -181,7 +152,8 @@ export default async function AgentsPage() {
           {runs.length === 0 ? (
             <div className="empty">
               <strong>No runs recorded.</strong>
-              This table fills in as scheduled agents report to the API.
+              Nothing has ever POSTed to <span className="mono">/api/agent-runs</span>. The state
+              column above says which agents that is true of and how long it has been true.
             </div>
           ) : (
             <div className="table-wrap">
@@ -264,13 +236,113 @@ Specialist subagents       .claude/agents/*.md
           <div className="tiny faint" style={{ marginTop: 10 }}>
             The Worker cron keeps the numbers fresh; the Actions agents do the thinking. They are
             separate on purpose — a Worker has a CPU budget measured in milliseconds, and an agent
-            run takes minutes.
+            run takes minutes. Project 6&rsquo;s two checks are the exception: pure fetch-and-compare
+            with no model in the loop, so they run as Worker cron triggers and have no Actions page.
           </div>
         </div>
       </div>
     </>
   );
 }
+
+function FleetRow({ status }: { status: FleetStatus }) {
+  const { agent, last } = status;
+  const project = PROJECTS.find((p) => p.slug === agent.projectSlug);
+
+  return (
+    <tr>
+      <td>
+        <div className="row" style={{ gap: 7 }}>
+          <Icon name={agent.icon} size={13} />
+          <strong style={{ fontSize: 13.5 }}>{agent.name}</strong>
+        </div>
+        <div className="tiny faint" style={{ marginTop: 2 }}>
+          {project ? <Link href={`/projects/${project.slug}`}>{project.name}</Link> : 'Portfolio'}
+          {' · '}
+          <span className="mono">{agent.workflow}</span>
+        </div>
+      </td>
+      <td className="small muted" style={{ maxWidth: 320 }}>
+        {agent.owns}
+      </td>
+      <td className="tiny">
+        <span className={`badge badge-${agent.schedule ? 'info' : 'neutral'}`}>
+          {agent.scheduleHuman}
+        </span>
+        {status.nextAt ? (
+          <div className="faint" style={{ marginTop: 2 }}>
+            next {relativeTime(status.nextAt.toISOString())}
+          </div>
+        ) : null}
+      </td>
+      <td className="tiny" style={{ maxWidth: 220 }}>
+        <span className={`badge badge-${STATE_TONE[status.state]}`}>
+          {STATE_LABEL[status.state]}
+        </span>
+        <div className="faint" style={{ marginTop: 2 }}>
+          {status.detail}
+        </div>
+      </td>
+      <td className="tiny">
+        {last ? (
+          <>
+            <span className={`badge badge-${runTone(last.status)}`}>{last.status}</span>
+            <div className="faint" style={{ marginTop: 2 }}>
+              {relativeTime(last.started_at)}
+            </div>
+          </>
+        ) : (
+          <span className="faint">never</span>
+        )}
+      </td>
+      <td>
+        {agent.platform === 'cloudflare-cron' ? (
+          // A Worker cron trigger has no Actions page to open, and a link to
+          // one that does not exist is worse than no link at all.
+          <span className="tiny faint" title="Runs as a Cloudflare Cron Trigger, not a workflow">
+            Worker cron
+          </span>
+        ) : agent.scope === 'portfolio' && agent.trigger === 'cron' ? (
+          <AgentTrigger agent={agent.name} workflow={agent.workflow} />
+        ) : (
+          <a
+            className="btn btn-sm"
+            href={`https://github.com/${agent.repo}/actions/workflows/${agent.workflow}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            title="Open in GitHub Actions"
+          >
+            <Icon name="arrow-up-right-from-square" size={11} />
+          </a>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * Silence is red, not grey.
+ *
+ * `never` and `overdue` deliberately share a tone with a failed run. They are
+ * the same size of problem and the old page rendered them as absence.
+ */
+const STATE_TONE: Record<FleetState, string> = {
+  never: 'bad',
+  overdue: 'bad',
+  stalled: 'warn',
+  unreadable: 'warn',
+  ok: 'good',
+  unscheduled: 'neutral',
+};
+
+const STATE_LABEL: Record<FleetState, string> = {
+  never: 'never reported',
+  overdue: 'overdue',
+  stalled: 'stalled',
+  unreadable: 'unreadable schedule',
+  ok: 'reporting',
+  unscheduled: 'on demand',
+};
 
 function runTone(status: string): string {
   return (

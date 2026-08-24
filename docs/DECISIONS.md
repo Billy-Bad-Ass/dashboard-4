@@ -158,3 +158,65 @@ dependency would be larger than the rest of the app's JavaScript.
 **Cost.** The flat-line case had to be handled explicitly — every value being
 zero (the current state of every revenue series here) must draw a visible line
 along the bottom rather than dividing by zero and producing `NaN` in the path.
+
+## Silence is a state, not an empty cell
+
+**Decision.** `lib/fleet.ts` computes each scheduled agent's last expected fire
+from its cron expression and compares it against `agent_runs`. `overdue` and
+`never reported` render in the same red as a failed run.
+
+**Why.** The Agents page once showed `RUNS RECORDED: 1` beside
+`FAILURES: 0 — Nothing failing`, while seven of eight scheduled agents read
+`LAST RUN: never`. Both numbers were true and together they were a lie: nothing
+was failing because nothing was reporting. `heartbeat-watchdog` — the agent
+whose entire job is noticing that the dashboard has gone quiet — had been
+silent since it was created, and the console reported that as health.
+
+This is the same rule as "unknown is not zero", one level up. There, a missing
+metric must not render as `0`. Here, a missing *run* must not render as an
+absence. Both failures are comfortable in the same direction: they make a
+broken system look like a working one with nothing to report.
+
+**Cost.** A cron parser this repo would otherwise not need, and a grace period
+that has to be tuned — an hour, capped at half the interval between fires, to
+absorb GitHub's best-effort scheduling without absorbing a dead schedule. An
+agent registered with a schedule it does not really keep now reads as
+permanently overdue; that is intended, and the fix is the schedule.
+
+## Most of these agents cannot move to Cloudflare Cron Triggers
+
+**Decision.** The scheduled agents in this repository stay on GitHub Actions.
+Project 6's `link-warden` and `redirect-guard` run as Worker cron triggers and
+are registered here as an explicit exception.
+
+**Why.** The migration is attractive — Workers Builds replaces the deploy
+workflow, `triggers.crons` replaces the scheduled ones, and
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` can then be deleted from the
+repository's Actions secrets. Project 6 did it in a day and it went cleanly.
+
+It went cleanly because both of its checks are pure `fetch`-and-compare: no
+model in the loop and no GitHub API call. Every agent here is the opposite.
+`portfolio-analyst`, `spend-auditor`, `pipeline-nudge` and `heartbeat-watchdog`
+all call Claude and open GitHub issues, and a Worker can do neither without
+holding an Anthropic key and a GitHub token as Worker secrets. The credentials
+do not disappear in the move; they relocate, from a secret store with an audit
+log and an OIDC story into one that has neither. Paying that to delete two
+secrets is a bad trade.
+
+There is a second cost, learned from Project 6: Workers Builds has no
+post-deploy hook, so its deploy no longer smoke-tests the live site. A bad
+deploy is now caught by a daily cron instead of within two minutes. Acceptable
+for a site with no sales; not acceptable for the dashboard the other projects
+are judged from.
+
+**Cost.** The deploy workflow and the four scheduled workflows stay, and so do
+their Cloudflare secrets. What is worth taking from Project 6 is the *shape* —
+a deterministic check that reports its finding whether or not an agent is
+available to interpret it — and that has been taken, in
+`.github/actions/report-run` and the watchdog's probe step.
+
+**Revisit when.** An agent here stops needing a model or the GitHub API. The
+deterministic half of `heartbeat-watchdog` — probe the pulse endpoint, compare
+`lastCronMinutes` against a threshold — is already exactly Project 6's shape and
+could move on its own, leaving the issue-opening half behind. That split is
+worth doing if the Actions minutes ever matter; today they do not.

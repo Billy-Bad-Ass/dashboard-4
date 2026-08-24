@@ -1,0 +1,54 @@
+name: Is an investigator configured?
+description: >-
+  Report whether a Claude credential exists, so a workflow can skip the agent
+  step instead of going red on a missing secret.
+
+# Why this exists.
+#
+# `claude-code-action` with neither CLAUDE_CODE_OAUTH_TOKEN nor
+# ANTHROPIC_API_KEY set fails, and takes the whole job red with it. In this
+# repository's watchdog the deterministic half — the probe that actually knows
+# whether the dashboard is alive — has already succeeded by then, and its
+# finding gets buried inside a job marked failed. A red run that means "no
+# credential" is indistinguishable from a red run that means "the dashboard is
+# down", so the run's colour stops carrying information.
+#
+# The mechanic: `secrets` is not available in a step-level `if`, so whether a
+# credential exists has to be computed in a step that can see the environment
+# and read back as an output.
+#
+# What is lost when this returns false: the investigation and the issue. What
+# is kept: the fact, as a ::warning on a run that is still green if the checks
+# themselves passed.
+
+inputs:
+  oauth_token:
+    description: secrets.CLAUDE_CODE_OAUTH_TOKEN
+    required: false
+    default: ''
+  api_key:
+    description: secrets.ANTHROPIC_API_KEY
+    required: false
+    default: ''
+
+outputs:
+  ready:
+    description: '"true" when at least one Claude credential is set.'
+    value: ${{ steps.check.outputs.ready }}
+
+runs:
+  using: composite
+  steps:
+    - id: check
+      shell: bash
+      env:
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.oauth_token }}
+        ANTHROPIC_API_KEY: ${{ inputs.api_key }}
+      run: |
+        if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] || [ -n "$ANTHROPIC_API_KEY" ]; then
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "A Claude credential is set; the agent step will run."
+        else
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+          echo "No CLAUDE_CODE_OAUTH_TOKEN and no ANTHROPIC_API_KEY. The agent step will be skipped rather than failed."
+        fi
