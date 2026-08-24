@@ -12,9 +12,26 @@
  *
  * Keeping the distinction visible matters: a scheduled job you think this repo
  * owns but that actually lives elsewhere is a job nobody maintains.
+ *
+ * The `schedule` field is not decoration. `lib/fleet.ts` reads it to work out
+ * when each agent should last have fired, which is the only reason the console
+ * can tell "nothing is wrong" apart from "nobody has said anything". An agent
+ * registered with a schedule it does not really keep will read as permanently
+ * overdue, and that is the correct outcome — fix the schedule, not the display.
  */
 
 export type AgentScope = 'portfolio' | 'project';
+
+/**
+ * What actually executes the agent.
+ *
+ * This started as an assumption rather than a field — every agent had a
+ * `.github/workflows/*.yml` and the console built an Actions URL from it.
+ * Project 6's two checks run as Cloudflare Cron Triggers on a Worker, so the
+ * assumption now has exceptions and they have to be visible: a link to an
+ * Actions page that does not exist is worse than no link.
+ */
+export type AgentPlatform = 'github-actions' | 'cloudflare-cron';
 
 export interface AgentSpec {
   name: string;
@@ -28,7 +45,9 @@ export interface AgentSpec {
   schedule: string | null;
   scheduleHuman: string;
   trigger: string;
-  /** The workflow file that runs it. */
+  /** What runs it. Only `github-actions` agents have an Actions page. */
+  platform: AgentPlatform;
+  /** The file that defines it: a workflow, or the wrangler config for a Worker cron. */
   workflow: string;
   icon: string;
 }
@@ -45,6 +64,7 @@ export const AGENTS: AgentSpec[] = [
     schedule: '0 7 * * 1',
     scheduleHuman: 'Mondays 07:00 UTC',
     trigger: 'cron',
+    platform: 'github-actions',
     workflow: 'agent-portfolio-review.yml',
     icon: 'magnifying-glass-chart',
   },
@@ -59,6 +79,7 @@ export const AGENTS: AgentSpec[] = [
     schedule: '0 9 1 * *',
     scheduleHuman: '1st of the month, 09:00 UTC',
     trigger: 'cron',
+    platform: 'github-actions',
     workflow: 'agent-spend-audit.yml',
     icon: 'file-invoice-dollar',
   },
@@ -73,6 +94,7 @@ export const AGENTS: AgentSpec[] = [
     schedule: '0 8 * * 1-5',
     scheduleHuman: 'Weekdays 08:00 UTC',
     trigger: 'cron',
+    platform: 'github-actions',
     workflow: 'agent-pipeline-nudge.yml',
     icon: 'handshake',
   },
@@ -87,6 +109,7 @@ export const AGENTS: AgentSpec[] = [
     schedule: '30 */6 * * *',
     scheduleHuman: 'Every 6 hours',
     trigger: 'cron',
+    platform: 'github-actions',
     workflow: 'agent-heartbeat-watchdog.yml',
     icon: 'tower-broadcast',
   },
@@ -99,6 +122,7 @@ export const AGENTS: AgentSpec[] = [
     schedule: null,
     scheduleHuman: 'On @claude mention',
     trigger: 'github',
+    platform: 'github-actions',
     workflow: 'agent-mention.yml',
     icon: 'robot',
   },
@@ -111,6 +135,7 @@ export const AGENTS: AgentSpec[] = [
     schedule: '0 8 * * 1',
     scheduleHuman: 'Mondays 08:00 UTC',
     trigger: 'cron',
+    platform: 'github-actions',
     workflow: 'agent-revenue-digest.yml',
     icon: 'brand-stripe',
   },
@@ -123,6 +148,7 @@ export const AGENTS: AgentSpec[] = [
     schedule: '0 7 * * 1',
     scheduleHuman: 'Mondays 07:00 UTC',
     trigger: 'cron',
+    platform: 'github-actions',
     workflow: 'agent-market-intel.yml',
     icon: 'magnifying-glass-chart',
   },
@@ -135,6 +161,7 @@ export const AGENTS: AgentSpec[] = [
     schedule: '0 6 1 * *',
     scheduleHuman: '1st of the month',
     trigger: 'cron',
+    platform: 'github-actions',
     workflow: 'agent-listing-refresh.yml',
     icon: 'pen',
   },
@@ -147,6 +174,7 @@ export const AGENTS: AgentSpec[] = [
     schedule: null,
     scheduleHuman: 'On v* tags',
     trigger: 'github',
+    platform: 'github-actions',
     workflow: 'agent-release-check.yml',
     icon: 'shield-halved',
   },
@@ -159,8 +187,45 @@ export const AGENTS: AgentSpec[] = [
     schedule: '15 4 * * *',
     scheduleHuman: 'Daily 04:15 UTC',
     trigger: 'cron',
+    platform: 'github-actions',
     workflow: 'refresh.yml',
     icon: 'rotate',
+  },
+  // Project 6's two checks are Cloudflare Cron Triggers on the bba-network-hub
+  // Worker rather than GitHub Actions — the first agents in this register with
+  // no workflow file and no Actions page. They got away with being a Worker
+  // because both are pure fetch-and-compare: no model in the loop and no
+  // GitHub API call, so neither needs a credential a Worker cannot safely
+  // hold. See docs/DECISIONS.md for why most of Project 4's cannot follow.
+  {
+    name: 'link-warden',
+    scope: 'project',
+    repo: 'Billy-Bad-Ass/Project-6',
+    projectSlug: 'project-6',
+    owns:
+      'Every business the register calls `live` is actually reachable. A brand hub pointing at ' +
+      'a dead subdomain costs more than one that admits the business is not up yet.',
+    schedule: '20 7 * * *',
+    scheduleHuman: 'Daily 07:20 UTC',
+    trigger: 'cron',
+    platform: 'cloudflare-cron',
+    workflow: 'wrangler.jsonc',
+    icon: 'link',
+  },
+  {
+    name: 'redirect-guard',
+    scope: 'project',
+    repo: 'Billy-Bad-Ass/Project-6',
+    projectSlug: 'project-6',
+    owns:
+      'The legacy apex paths that carry paying customers to their downloads. These are the only ' +
+      'URLs in the portfolio a real buyer already holds, so a broken one loses a sale nobody sees.',
+    schedule: '40 7 * * *',
+    scheduleHuman: 'Daily 07:40 UTC',
+    trigger: 'cron',
+    platform: 'cloudflare-cron',
+    workflow: 'wrangler.jsonc',
+    icon: 'shield-halved',
   },
 ];
 

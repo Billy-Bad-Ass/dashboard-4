@@ -51,6 +51,15 @@ them — it shows their runs, because they report to `/api/agent-runs`.
 | `listing-copywriter` | Project-2 | Titles, descriptions, marketplace copy. |
 | `release-qa` | Project-2 | Go/no-go before a deploy. |
 | `dataset-refresh` | Project-1 | Rebuilds the pSEO dataset daily. |
+| `link-warden` | Project-6 | Every business the register calls `live` is reachable. |
+| `redirect-guard` | Project-6 | The legacy apex paths carrying paying customers to downloads. |
+
+Project 6's two are the first agents here that are **not** GitHub Actions: both
+run as Cloudflare Cron Triggers on the `bba-network-hub` Worker. The register
+carries a `platform` field for exactly this reason — the console used to build
+an Actions URL from the workflow filename for every agent, and a link to a page
+that does not exist is worse than no link. See `docs/DECISIONS.md` for why most
+of the agents in *this* repository cannot follow them onto a Worker.
 
 Keeping the distinction visible matters: a scheduled job you believe this repo
 owns, but which actually lives elsewhere, is a job nobody maintains.
@@ -97,22 +106,44 @@ what happened.
 ## Reporting a run
 
 Every scheduled workflow POSTs its outcome so the console shows what actually
-ran rather than what the YAML claims would run:
+ran rather than what the YAML claims would run. Use the composite action rather
+than a hand-rolled curl:
 
-```bash
-curl -sf -X POST "$DASHBOARD_URL/api/agent-runs" \
-  -H "Authorization: Bearer $DASHBOARD_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"agent":"portfolio-analyst","trigger":"cron","status":"ok",
-       "summary":"Weekly review.","artifact_url":"https://github.com/.../runs/123"}'
+```yaml
+- name: Report the outcome
+  if: always()
+  uses: ./.github/actions/report-run
+  with:
+    agent: portfolio-analyst          # must match a name in config/agents.ts
+    status: ${{ steps.review.outcome == 'failure' && 'failed' || 'ok' }}
+    started_at: ${{ steps.start.outputs.started }}
+    summary: Weekly portfolio review.
+    artifact_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    dashboard_url: ${{ secrets.DASHBOARD_URL }}
+    dashboard_token: ${{ secrets.DASHBOARD_TOKEN }}
+    access_client_id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+    access_client_secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 ```
-
-Every reporting step ends in `|| true`. The dashboard being down must not fail
-an agent run — losing the log entry is a much smaller problem than losing the
-review.
 
 Valid `status`: `queued`, `running`, `ok`, `failed`, `skipped`.
 Valid `trigger`: `cron`, `manual`, `github`, `webhook`.
+
+**Two rules that pull against each other, and both hold.** A reporting problem
+must never fail the run — losing a log entry is a much smaller loss than losing
+the review the run just produced. And a reporting problem must never look like
+success.
+
+Every reporting step used to end in `|| true`, which satisfied the first rule
+by abandoning the second. With `DASHBOARD_URL` unset that posts nothing, prints
+nothing and exits 0, so four workflows reported nothing for their entire lives
+while the console showed no failures. The action exits 0 always and annotates
+loudly on anything that is not a 2xx.
+
+**A 3xx is not a success.** `curl -f` does not fail on a redirect, so a POST
+that Cloudflare Access answers with a `302` to its login page reads as a
+success to `curl -sf`. The action reads the status code and requires a 2xx.
+Project 6 shipped the naive version of this fix first and logged
+`Reported to ...` over exactly that redirect.
 
 ## Guardrails
 
@@ -134,10 +165,66 @@ These are in the agent definitions and they are not negotiable:
 
 In this repository's Actions secrets:
 
-| Secret | Used by |
-| --- | --- |
-| `ANTHROPIC_API_KEY` | every agent workflow |
-| `DASHBOARD_URL` | every agent workflow |
-| `DASHBOARD_TOKEN` | the run-reporting steps |
+| Secret | Used by | Missing means |
+| --- | --- | --- |
+| `CLAUDE_CODE_OAUTH_TOKEN` | every agent workflow | see below |
+| `ANTHROPIC_API_KEY` | every agent workflow, and `/ask` | see below |
+| `DASHBOARD_URL` | every agent workflow | nothing is reported, and the console shows every agent as never having run |
+| `DASHBOARD_TOKEN` | the run-reporting steps | a 401 from the write endpoints, once the Worker has one set |
+| `CF_ACCESS_CLIENT_ID` | the run-reporting steps | a 302 to the Access login page, once `DASHBOARD_URL` is set |
+| `CF_ACCESS_CLIENT_SECRET` | the run-reporting steps | as above |
 
 `GITHUB_TOKEN` is provided automatically by Actions.
+
+**A Claude credential is optional, and every workflow is built that way.** With
+neither `CLAUDE_CODE_OAUTH_TOKEN` nor `ANTHROPIC_API_KEY` set,
+`claude-code-action` fails and takes the whole job red — which in the watchdog
+meant the deterministic probe had *already* found the answer and had it buried
+inside a job marked failed. A red run meaning "no credential" is
+indistinguishable from a red run meaning "the dashboard is down", so the run's
+colour stopped carrying information.
+
+Every workflow now gates the agent step on `./.github/actions/investigator` and
+emits a `::warning` in its place. You lose the investigation and the issue. You
+do not lose the fact.
+
+Prefer `CLAUDE_CODE_OAUTH_TOKEN`: on a Max plan those runs cost nothing, where
+an API key bills per token. The action gives the API key precedence when both
+are present, which is why the key is deliberately blanked in the YAML when a
+subscription token exists.
+
+**Cloudflare Access fronts the Worker at *Worker* scope**, not hostname scope,
+so it covers `/api/agent-runs` on every hostname routed there. Once
+`DASHBOARD_URL` is set, CI posting to it needs an Access **service token** plus
+a **Service Auth** policy on the application — *alongside* the existing
+"Only me" policy, not replacing it.
+
+## Silence is a finding
+
+`config/agents.ts` says what should run; `agent_runs` says what reported. The
+gap between them is computed in `lib/fleet.ts` and shown on `/agents`.
+
+This exists because the console once displayed `RUNS RECORDED: 1` and
+`FAILURES: 0 — Nothing failing` while seven of eight scheduled agents had never
+reported once. Both numbers were true. Together they were a lie: nothing was
+failing because nothing was reporting.
+
+Every scheduled agent carries a cron expression, so the time it should last
+have fired is arithmetic, and an agent that missed it is a finding with a
+timestamp rather than an empty cell. The states:
+
+| State | Means |
+| --- | --- |
+| `reporting` | reported at or since its last scheduled fire |
+| `overdue` | ran before, nothing since the fire it should have reported |
+| `never reported` | scheduled, and no run has ever been recorded |
+| `stalled` | a start posted and no finish ever did |
+| `unreadable schedule` | the registered cron could not be parsed |
+| `on demand` | event-triggered; there is no schedule to be late for |
+
+`overdue` and `never reported` are rendered in the same red as a failed run, on
+purpose. A failed run is a run — it reported. Silence did not.
+
+One consequence worth stating plainly: a schedule in the register that the
+agent does not really keep will read as permanently overdue. That is the
+correct outcome. Fix the schedule, not the display.

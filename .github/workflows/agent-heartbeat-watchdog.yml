@@ -3,6 +3,13 @@ name: Agent · Heartbeat watchdog
 # The one check nothing else would catch: if the Worker cron stops, the
 # dashboard keeps serving its last known numbers and looks perfectly healthy
 # while being arbitrarily stale.
+#
+# This job had that exact failure itself. It fired on schedule four times a
+# day, failed on a missing Claude credential every time, recorded nothing, and
+# the console showed it as "LAST RUN: never" next to "FAILURES: 0". The agent
+# whose job is noticing silence was silent, and nothing noticed. Hence the
+# shape below: the probe is deterministic and always reports its finding, and
+# the agent is an optional extra on top of it.
 on:
   schedule:
     - cron: '30 */6 * * *'
@@ -23,29 +30,112 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - id: start
+        run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Probe the pulse endpoint
         id: probe
-        # A plain curl first, so a dead Worker is distinguished from a Worker
-        # that answers with bad data. Only the second case needs an agent.
+        # A plain HTTP read first, so a dead Worker is distinguished from a
+        # Worker that answers with bad data. Only the second case needs an
+        # agent.
+        #
+        # The status code is read rather than relying on `curl -sf`, which
+        # collapses "no URL configured", "DNS failed", "Access redirected us to
+        # a login page" and "the Worker returned a 522" into the same empty
+        # string. Those are four different problems with four different fixes,
+        # and a watchdog that cannot tell them apart is not much of a watchdog.
         run: |
-          if ! BODY=$(curl -sf --max-time 20 "$DASHBOARD_URL/api/pulse"); then
-            echo "reachable=false" >> "$GITHUB_OUTPUT"
+          set +e
+
+          if [ -z "$DASHBOARD_URL" ]; then
+            echo "verdict=unconfigured" >> "$GITHUB_OUTPUT"
+            echo "detail=DASHBOARD_URL is not set as a repository secret, so there is nothing to probe." >> "$GITHUB_OUTPUT"
+            echo "minutes=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "reachable=true" >> "$GITHUB_OUTPUT"
-          MINUTES=$(echo "$BODY" | jq -r '.lastCronMinutes // "null"')
+
+          BASE="${DASHBOARD_URL%/}"
+          ARGS=()
+          if [ -n "$CF_ACCESS_CLIENT_ID" ] && [ -n "$CF_ACCESS_CLIENT_SECRET" ]; then
+            ARGS+=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID")
+            ARGS+=(-H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          fi
+
+          CODE=$(curl -s -o /tmp/pulse.json -w '%{http_code}' --max-time 20 "${ARGS[@]}" "$BASE/api/pulse")
+          [ -z "$CODE" ] && CODE=000
+          echo "Probe of $BASE/api/pulse answered $CODE."
+
+          case "$CODE" in
+            2*) ;;
+            000)
+              echo "verdict=unreachable" >> "$GITHUB_OUTPUT"
+              echo "detail=Nothing answered at $BASE/api/pulse — DNS, TLS or a connection timeout rather than an HTTP error." >> "$GITHUB_OUTPUT"
+              echo "minutes=" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            3*|401|403)
+              echo "verdict=blocked" >> "$GITHUB_OUTPUT"
+              echo "detail=$BASE/api/pulse answered $CODE — Cloudflare Access answered instead of the Worker, and this runner holds no Access service token. This says nothing about whether the dashboard is healthy." >> "$GITHUB_OUTPUT"
+              echo "minutes=" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            *)
+              echo "verdict=error" >> "$GITHUB_OUTPUT"
+              echo "detail=$BASE/api/pulse answered $CODE." >> "$GITHUB_OUTPUT"
+              echo "minutes=" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+
+          # A 200 carrying something that is not JSON — an Access interstitial,
+          # an HTML error page from a proxy — must not be read as "the cron has
+          # never run". That would open an issue about a healthy cron, which is
+          # the same class of mistake as the ones this workflow is fixing.
+          if ! jq -e . /tmp/pulse.json >/dev/null 2>&1; then
+            echo "verdict=error" >> "$GITHUB_OUTPUT"
+            echo "detail=$BASE/api/pulse answered $CODE but the body was not JSON, so the dashboard's own health could not be read." >> "$GITHUB_OUTPUT"
+            echo "minutes=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          MINUTES=$(jq -r '.lastCronMinutes // empty' /tmp/pulse.json)
           echo "minutes=$MINUTES" >> "$GITHUB_OUTPUT"
-          echo "Last cron: $MINUTES minutes ago"
+
+          if [ -z "$MINUTES" ]; then
+            echo "verdict=never-run" >> "$GITHUB_OUTPUT"
+            echo "detail=The dashboard answered, but has no record of the Worker cron ever completing." >> "$GITHUB_OUTPUT"
+          elif [ "$MINUTES" -gt 30 ]; then
+            echo "verdict=stale" >> "$GITHUB_OUTPUT"
+            echo "detail=The Worker cron last completed $MINUTES minutes ago; it is scheduled every 10." >> "$GITHUB_OUTPUT"
+          else
+            echo "verdict=healthy" >> "$GITHUB_OUTPUT"
+            echo "detail=The Worker cron completed $MINUTES minutes ago." >> "$GITHUB_OUTPUT"
+          fi
         env:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+
+      - name: Is an investigator configured?
+        id: investigator
+        if: always()
+        uses: ./.github/actions/investigator
+        with:
+          oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Investigate and report
+        id: investigate
         # Only spend an agent run when something is actually wrong. A healthy
         # watchdog does nothing at all, four times a day.
+        #
+        # `unconfigured` and `blocked` are deliberately not in this list: both
+        # are problems with this runner's configuration rather than with the
+        # dashboard, and an agent cannot fix a missing repository secret. They
+        # are annotated below instead.
         if: >-
-          steps.probe.outputs.reachable == 'false' ||
-          steps.probe.outputs.minutes == 'null' ||
-          fromJSON(steps.probe.outputs.minutes || '0') > 30
+          contains(fromJSON('["unreachable","error","never-run","stale"]'), steps.probe.outputs.verdict)
+          && steps.investigator.outputs.ready == 'true'
         uses: anthropics/claude-code-action@v1
         with:
           # Prefer the Claude subscription token when it is set: on a Max plan
@@ -58,8 +148,8 @@ jobs:
           prompt: |
             Use the `heartbeat-watchdog` subagent.
 
-            The probe found: reachable=${{ steps.probe.outputs.reachable }},
-            lastCronMinutes=${{ steps.probe.outputs.minutes }}.
+            The probe found: ${{ steps.probe.outputs.verdict }} —
+            ${{ steps.probe.outputs.detail }}
 
             Search for an existing OPEN issue labelled `ops` about a stale heartbeat
             first. If one exists, comment on it with the current reading instead of
@@ -69,3 +159,40 @@ jobs:
             --allowed-tools Read,Bash,Grep,Glob,WebFetch,Agent
         env:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+
+      - name: Say it anyway if nothing could investigate
+        # The finding survives the absence of an agent. You lose the
+        # investigation and the issue; you do not lose the fact.
+        if: >-
+          always()
+          && contains(fromJSON('["unreachable","error","never-run","stale"]'), steps.probe.outputs.verdict)
+          && steps.investigator.outputs.ready != 'true'
+        run: |
+          echo "::warning title=Heartbeat ${{ steps.probe.outputs.verdict }}::${{ steps.probe.outputs.detail }}  No CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY is set, so no agent looked into it and no issue was opened."
+
+      - name: Say so if the watchdog itself is not wired up
+        if: >-
+          always()
+          && contains(fromJSON('["unconfigured","blocked"]'), steps.probe.outputs.verdict)
+        run: |
+          echo "::warning title=Watchdog cannot see the dashboard::${{ steps.probe.outputs.detail }}  This run proves nothing about the dashboard's health — fix the runner's configuration first."
+
+      - name: Tell the dashboard this ran
+        # The watchdog never had one of these, which is the whole reason it
+        # showed as "never run" while firing on schedule four times a day.
+        if: always()
+        uses: ./.github/actions/report-run
+        with:
+          agent: heartbeat-watchdog
+          trigger: ${{ github.event_name == 'schedule' && 'cron' || 'manual' }}
+          started_at: ${{ steps.start.outputs.started }}
+          status: >-
+            ${{ contains(fromJSON('["unreachable","error","never-run","stale"]'), steps.probe.outputs.verdict) && 'failed'
+            || steps.probe.outputs.verdict == 'healthy' && 'ok'
+            || 'skipped' }}
+          summary: ${{ steps.probe.outputs.detail }}
+          artifact_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          dashboard_url: ${{ secrets.DASHBOARD_URL }}
+          dashboard_token: ${{ secrets.DASHBOARD_TOKEN }}
+          access_client_id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          access_client_secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}

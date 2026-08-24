@@ -30,8 +30,16 @@ jobs:
       - id: start
         run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
+      - name: Is an investigator configured?
+        id: investigator
+        uses: ./.github/actions/investigator
+        with:
+          oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
       - name: Audit the ledger
         id: audit
+        if: steps.investigator.outputs.ready == 'true'
         uses: anthropics/claude-code-action@v1
         with:
           # Prefer the Claude subscription token when it is set: on a Max plan
@@ -58,18 +66,28 @@ jobs:
         env:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
 
+      - name: Say why the ledger was not audited
+        if: always() && steps.investigator.outputs.ready != 'true'
+        run: |
+          echo "::warning title=Ledger not audited::No CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY is set, so this month's spend was never reconciled against reality. An unrecorded cost makes the business look cheaper to run than it is, and nothing checked for one."
+
       - name: Report the outcome
         if: always()
-        run: |
-          STATUS=ok
-          [ "${{ steps.audit.outcome }}" = "failure" ] && STATUS=failed
-          curl -sf -X POST "$DASHBOARD_URL/api/agent-runs" \
-            -H "Authorization: Bearer $DASHBOARD_TOKEN" \
-            -H 'Content-Type: application/json' \
-            -d "{\"agent\":\"spend-auditor\",\"trigger\":\"cron\",\"status\":\"$STATUS\",
-                 \"started_at\":\"${{ steps.start.outputs.started }}\",
-                 \"summary\":\"Monthly spend audit.\",
-                 \"artifact_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true
-        env:
-          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
-          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+        uses: ./.github/actions/report-run
+        with:
+          agent: spend-auditor
+          trigger: ${{ github.event_name == 'schedule' && 'cron' || 'manual' }}
+          started_at: ${{ steps.start.outputs.started }}
+          status: >-
+            ${{ steps.audit.outcome == 'failure' && 'failed'
+            || steps.investigator.outputs.ready != 'true' && 'skipped'
+            || 'ok' }}
+          summary: >-
+            ${{ steps.investigator.outputs.ready == 'true'
+            && 'Monthly spend audit.'
+            || 'Skipped: no Claude credential is configured, so the ledger was not reconciled.' }}
+          artifact_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          dashboard_url: ${{ secrets.DASHBOARD_URL }}
+          dashboard_token: ${{ secrets.DASHBOARD_TOKEN }}
+          access_client_id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          access_client_secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}

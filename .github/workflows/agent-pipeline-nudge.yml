@@ -30,8 +30,19 @@ jobs:
       - id: start
         run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
+      - name: Is an investigator configured?
+        id: investigator
+        uses: ./.github/actions/investigator
+        with:
+          oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
       - name: Check the pipeline
         id: nudge
+        # Without this gate the action fails on a missing credential and takes
+        # the job red, which is indistinguishable from the pipeline check
+        # itself having gone wrong.
+        if: steps.investigator.outputs.ready == 'true'
         uses: anthropics/claude-code-action@v1
         with:
           # Prefer the Claude subscription token when it is set: on a Max plan
@@ -55,18 +66,28 @@ jobs:
         env:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
 
+      - name: Say why nothing checked the pipeline
+        if: always() && steps.investigator.outputs.ready != 'true'
+        run: |
+          echo "::warning title=Pipeline not checked::No CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY is set, so nothing read the pipeline today and no issue was opened. Actions that are due are still due — nobody has looked."
+
       - name: Report the outcome
         if: always()
-        run: |
-          STATUS=ok
-          [ "${{ steps.nudge.outcome }}" = "failure" ] && STATUS=failed
-          curl -sf -X POST "$DASHBOARD_URL/api/agent-runs" \
-            -H "Authorization: Bearer $DASHBOARD_TOKEN" \
-            -H 'Content-Type: application/json' \
-            -d "{\"agent\":\"pipeline-nudge\",\"trigger\":\"cron\",\"status\":\"$STATUS\",
-                 \"started_at\":\"${{ steps.start.outputs.started }}\",
-                 \"summary\":\"Weekday pipeline check.\",
-                 \"artifact_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true
-        env:
-          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
-          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+        uses: ./.github/actions/report-run
+        with:
+          agent: pipeline-nudge
+          trigger: ${{ github.event_name == 'schedule' && 'cron' || 'manual' }}
+          started_at: ${{ steps.start.outputs.started }}
+          status: >-
+            ${{ steps.nudge.outcome == 'failure' && 'failed'
+            || steps.investigator.outputs.ready != 'true' && 'skipped'
+            || 'ok' }}
+          summary: >-
+            ${{ steps.investigator.outputs.ready == 'true'
+            && 'Weekday pipeline check.'
+            || 'Skipped: no Claude credential is configured, so nothing read the pipeline.' }}
+          artifact_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          dashboard_url: ${{ secrets.DASHBOARD_URL }}
+          dashboard_token: ${{ secrets.DASHBOARD_TOKEN }}
+          access_client_id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          access_client_secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
