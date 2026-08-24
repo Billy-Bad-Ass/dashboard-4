@@ -194,7 +194,7 @@ export default async function SetupPage() {
               <div className="small muted" style={{ marginTop: 3 }}>
                 A GitHub Actions runner does the command-line work. Full tap-by-tap version:{' '}
                 <a
-                  href="https://github.com/Billy-Bad-Ass/Project-4/blob/main/docs/IPAD.md"
+                  href="https://github.com/Billy-Bad-Ass/dashboard-4/blob/main/docs/IPAD.md"
                   target="_blank"
                   rel="noreferrer noopener"
                 >

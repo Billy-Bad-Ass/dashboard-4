@@ -5,6 +5,7 @@ import type { Project } from '../config/portfolio.ts';
 import type { ProjectFinance } from '../lib/finance.ts';
 import type { StripeSnapshot } from '../lib/connectors/stripe.ts';
 import type { CloudflareSnapshot } from '../lib/connectors/cloudflare.ts';
+import type { RepoPulse } from '../lib/connectors/github.ts';
 
 /**
  * The unknown-versus-zero rule, at the one place it was actually broken.
@@ -174,4 +175,70 @@ test('a Worker with no traffic rows yet is unknown, not zero', () => {
 
 test('an unreachable Cloudflare leaves visitors unknown', () => {
   assert.equal(visitorsFor(siteWithScript('bba-network-store'), null), null);
+});
+
+
+/**
+ * The `commits` vital, and the reason the repo names in `config/portfolio.ts`
+ * mattered more than a tidy-up.
+ *
+ * `fetchRepoPulse` returns a fully-shaped `RepoPulse` with `exists: false` when
+ * GitHub 404s, and every count on it is a structural zero rather than a
+ * measurement. While the config pointed at `Billy-Bad-Ass/Project-1..6` — names
+ * that never existed — an unconfigured token hid this behind "—", but a working
+ * token would have rendered a confident "0 commits" for six repositories the
+ * API had refused to describe.
+ */
+
+function committer(): Project {
+  const base = seller();
+  return {
+    ...base,
+    vitals: [
+      { key: 'commits', label: 'Commits', source: 'github', unit: 'count', target: null, hint: '' },
+    ],
+  };
+}
+
+function repoPulse(over: Partial<RepoPulse> = {}): RepoPulse {
+  return {
+    repo: 'owner/p',
+    exists: true,
+    defaultBranch: 'main',
+    commitCount: 0,
+    botCommitCount: 0,
+    lastCommitAt: null,
+    lastCommitMessage: null,
+    lastAnyCommitAt: null,
+    openIssues: 0,
+    openPulls: 0,
+    ciStatus: null,
+    ciUrl: null,
+    sizeKb: 0,
+    language: null,
+    pushedAt: null,
+    ...over,
+  };
+}
+
+function commitsFor(repo: RepoPulse | null) {
+  return resolveVitals(committer(), repo, finance(), null, new Map(), null, 0).commits;
+}
+
+test('a repository GitHub could not read reports unknown, not zero commits', () => {
+  assert.equal(commitsFor(repoPulse({ exists: false })), null);
+});
+
+test('a repository that exists but had no human commits reports a real zero', () => {
+  // The other half of the rule again: GitHub answered, and the answer is that
+  // nobody has committed in the window.
+  assert.equal(commitsFor(repoPulse({ exists: true, commitCount: 0 })), 0);
+});
+
+test('a real commit count passes through untouched', () => {
+  assert.equal(commitsFor(repoPulse({ exists: true, commitCount: 12 })), 12);
+});
+
+test('no GitHub answer at all leaves commits unknown', () => {
+  assert.equal(commitsFor(null), null);
 });

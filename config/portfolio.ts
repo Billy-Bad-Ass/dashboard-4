@@ -97,7 +97,7 @@ export { DEFAULT_CURRENCY as CURRENCY } from '@/lib/money';
 
 /**
  * Money is stored and passed around in minor units, everywhere, always. `500`
- * is $5.00. Project-2 uses the same convention; the classic failure in this
+ * is $5.00. network-store-2 uses the same convention; the classic failure in this
  * codebase is a 100x error, so there is one formatter and it takes minor units.
  */
 export const MONEY_UNIT = 'minor' as const;
@@ -107,7 +107,7 @@ export const PROJECTS: Project[] = [
     slug: 'project-1',
     name: 'Website Health Check',
     tagline: 'A plain-English website audit, delivered within a working day. $100.',
-    repo: 'Billy-Bad-Ass/Project-1',
+    repo: 'Billy-Bad-Ass/sitecheck-1',
     stage: 'shipped',
     revenueModel: 'stripe',
     accent: '#2B5CE6',
@@ -173,7 +173,7 @@ export const PROJECTS: Project[] = [
     slug: 'project-2',
     name: 'BBA Network Store',
     tagline: 'Printable reference guides sold as digital downloads.',
-    repo: 'Billy-Bad-Ass/Project-2',
+    repo: 'Billy-Bad-Ass/network-store-2',
     cloudflareScript: 'bba-network-store',
     stage: 'shipped',
     revenueModel: 'stripe',
@@ -247,7 +247,7 @@ export const PROJECTS: Project[] = [
     slug: 'project-3',
     name: 'Hardstop',
     tagline: 'Automated trading research. Refuses to risk money until a strategy survives testing.',
-    repo: 'Billy-Bad-Ass/Project-3',
+    repo: 'Billy-Bad-Ass/trading-3',
     stage: 'building',
     revenueModel: 'none',
     accent: '#B5179E',
@@ -307,7 +307,7 @@ export const PROJECTS: Project[] = [
     slug: 'project-4',
     name: 'Heartbeat',
     tagline: 'This dashboard. The instrument panel for everything else.',
-    repo: 'Billy-Bad-Ass/Project-4',
+    repo: 'Billy-Bad-Ass/dashboard-4',
     cloudflareScript: 'bba-heartbeat',
     stage: 'building',
     revenueModel: 'none',
@@ -361,7 +361,7 @@ export const PROJECTS: Project[] = [
     slug: 'project-5',
     name: 'Growth OS',
     tagline: 'Agent-run paid ads and organic publishing, with a human approving every spend.',
-    repo: 'Billy-Bad-Ass/Project-5',
+    repo: 'Billy-Bad-Ass/growth-os-5',
     cloudflareScript: 'bba-growth-os',
     stage: 'building',
     revenueModel: 'none',
@@ -428,7 +428,7 @@ export const PROJECTS: Project[] = [
     slug: 'project-6',
     name: 'BBA Network Web',
     tagline: 'The public face — brand hub, storefront and audit service across subdomains.',
-    repo: 'Billy-Bad-Ass/Project-6',
+    repo: 'Billy-Bad-Ass/web-6',
     cloudflareScript: 'bba-network-hub',
     stage: 'building',
     revenueModel: 'none',

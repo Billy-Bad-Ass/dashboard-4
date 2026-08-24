@@ -22,7 +22,7 @@ explicit case per key rather than a lookup table.
 **Decision.** Every amount, in D1 and in TypeScript, is an integer of minor
 units. `500` is $5.00.
 
-**Why.** Matches Project-2, so moving between repos does not mean switching
+**Why.** Matches network-store-2, so moving between repos does not mean switching
 convention. Floats in SQLite store 5.00 as 4.999999. And the failure mode of
 getting it wrong is a 100x error on a number you then make decisions from.
 
@@ -63,7 +63,7 @@ bearer so per-project shares always add back to the total.
 
 **Why.** It is already being paid for. D1 gives 5 GB (this uses megabytes), R2
 egress is free, and the Paid plan is what allows a 10-minute cron at all. It is
-also the same stack as Project-2, so operational knowledge transfers.
+also the same stack as network-store-2, so operational knowledge transfers.
 
 **Cost.** No Node filesystem, no long-running processes, a CPU budget in
 milliseconds. That is what forced the split between the Worker cron (polls) and

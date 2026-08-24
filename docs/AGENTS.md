@@ -46,13 +46,13 @@ them — it shows their runs, because they report to `/api/agent-runs`.
 
 | Agent | Repository | Owns |
 | --- | --- | --- |
-| `revenue-analyst` | Project-2 | The store's Stripe digest. |
-| `market-researcher` | Project-2 | Demand signals, competitor pricing, keyword gaps. |
-| `listing-copywriter` | Project-2 | Titles, descriptions, marketplace copy. |
-| `release-qa` | Project-2 | Go/no-go before a deploy. |
-| `dataset-refresh` | Project-1 | Rebuilds the pSEO dataset daily. |
-| `link-warden` | Project-6 | Every business the register calls `live` is reachable. |
-| `redirect-guard` | Project-6 | The legacy apex paths carrying paying customers to downloads. |
+| `revenue-analyst` | network-store-2 | The store's Stripe digest. |
+| `market-researcher` | network-store-2 | Demand signals, competitor pricing, keyword gaps. |
+| `listing-copywriter` | network-store-2 | Titles, descriptions, marketplace copy. |
+| `release-qa` | network-store-2 | Go/no-go before a deploy. |
+| `dataset-refresh` | sitecheck-1 | Rebuilds the pSEO dataset daily. |
+| `link-warden` | web-6 | Every business the register calls `live` is reachable. |
+| `redirect-guard` | web-6 | The legacy apex paths carrying paying customers to downloads. |
 
 Project 6's two are the first agents here that are **not** GitHub Actions: both
 run as Cloudflare Cron Triggers on the `bba-network-hub` Worker. The register
