@@ -23,10 +23,18 @@ export interface RepoPulse {
   repo: string;
   exists: boolean;
   defaultBranch: string;
-  /** Commits in the trailing window. */
+  /**
+   * Commits in the trailing window BY A PERSON. Automated commits are counted
+   * separately and deliberately excluded here — see `isAutomated`.
+   */
   commitCount: number;
+  /** Automated commits in the same window. Real activity; not evidence of a person. */
+  botCommitCount: number;
+  /** The last commit by a person. This is the clock a staleness check must use. */
   lastCommitAt: string | null;
   lastCommitMessage: string | null;
+  /** The last commit of any kind, automated included. Shown as context, never judged on. */
+  lastAnyCommitAt: string | null;
   openIssues: number;
   openPulls: number;
   /** Conclusion of the most recent CI run: success | failure | null. */
@@ -97,7 +105,32 @@ interface RepoResponse {
 }
 
 interface CommitResponse {
-  commit: { message: string; author: { date: string } };
+  commit: { message: string; author: { date: string; email?: string; name?: string } };
+  /** The GitHub account, when the commit maps to one. `type` is 'Bot' for apps. */
+  author: { login?: string; type?: string } | null;
+}
+
+/**
+ * Was this commit written by a machine?
+ *
+ * Three independent signals, because any one of them can be absent: GitHub
+ * types the account as a Bot, the login carries the `[bot]` suffix, or the
+ * commit is attributed to the shared github-actions noreply address. Hardstop
+ * writes as `runner[bot]` and `watchman[bot]` over that shared address, so in
+ * practice the last one does most of the work.
+ *
+ * Deliberately conservative: an unrecognised author counts as a person. Over-
+ * counting humans makes a project look more alive than it is, which is the
+ * safer direction to be wrong in — the opposite would hide a real commit.
+ */
+function isAutomated(c: CommitResponse): boolean {
+  if (c.author?.type === 'Bot') return true;
+  if (c.author?.login?.endsWith('[bot]')) return true;
+  const email = c.commit.author.email ?? '';
+  const name = c.commit.author.name ?? '';
+  return /users\.noreply\.github\.com$/.test(email) && /\[bot\]$/.test(name)
+    ? true
+    : /github-actions\[bot\]@/.test(email) || /\[bot\]$/.test(name);
 }
 
 interface RunsResponse {
@@ -116,8 +149,10 @@ export async function fetchRepoPulse(
         exists: false,
         defaultBranch: 'main',
         commitCount: 0,
+        botCommitCount: 0,
         lastCommitAt: null,
         lastCommitMessage: null,
+        lastAnyCommitAt: null,
         openIssues: 0,
         openPulls: 0,
         ciStatus: null,
@@ -135,7 +170,12 @@ export async function fetchRepoPulse(
       gh<RunsResponse>(`/repos/${repo}/actions/runs?per_page=1`),
     ]);
 
-    const latest = commits?.[0];
+    // Split the window before anything reads a count. A project whose cron
+    // commits every few hours would otherwise never age past zero days, and
+    // assessHealth's 21-day staleness rule could never fire on it.
+    const human = (commits ?? []).filter((c) => !isAutomated(c));
+    const bots = (commits ?? []).length - human.length;
+    const latest = human[0];
     const run = runs?.workflow_runs?.[0];
     const pullCount = pulls?.length ?? 0;
 
@@ -143,9 +183,11 @@ export async function fetchRepoPulse(
       repo,
       exists: true,
       defaultBranch: meta.default_branch,
-      commitCount: commits?.length ?? 0,
+      commitCount: human.length,
+      botCommitCount: bots,
       lastCommitAt: latest?.commit.author.date ?? null,
       lastCommitMessage: latest?.commit.message.split('\n')[0] ?? null,
+      lastAnyCommitAt: commits?.[0]?.commit.author.date ?? null,
       // GitHub's open_issues_count includes pull requests. Subtracting them is
       // the only way to get the number a human means by "open issues".
       openIssues: Math.max(0, meta.open_issues_count - pullCount),

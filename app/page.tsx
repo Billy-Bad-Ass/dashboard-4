@@ -20,6 +20,8 @@ export default async function HeartbeatPage() {
 
   const active = projects.filter((p) => p.project.stage !== 'idea' && p.project.stage !== 'paused');
   const stalled = projects.filter((p) => p.health === 'stalled');
+  // Human commits only. Adding the bots in would let one cron inflate the
+  // portfolio's headline activity figure indefinitely.
   const commits30d = projects.reduce((a, p) => a + (p.repo?.commitCount ?? 0), 0);
 
   return (
