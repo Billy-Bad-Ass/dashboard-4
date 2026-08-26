@@ -22,6 +22,8 @@
  * cases, which is what a working calendar contains.
  */
 
+import { DISPLAY_ZONE } from '../dates';
+
 import { cfEnv } from '../db';
 import { attempt, unconfigured, type ConnectorResult } from './types';
 
@@ -67,23 +69,95 @@ function unescapeText(value: string): string {
 /**
  * `20260823T140000Z`, `20260823T140000` or `20260823` → ISO.
  *
- * A floating time (no Z, no TZID handling) is treated as UTC. For a one-person
- * business running on one calendar that is close enough; the alternative is
- * shipping a timezone database into a Worker.
+ * A **floating** time — no trailing `Z` — is a wall-clock time in whatever
+ * zone the person is standing in. It used to be read as UTC here, on the
+ * grounds that a timezone database was too much to ship into a Worker. That
+ * reason no longer holds: `Intl.DateTimeFormat` in workerd carries the zone
+ * data already, so the offset is two format calls rather than a dependency.
+ *
+ * Reading it as UTC was not a rounding error. A 09:00 meeting became
+ * 09:00Z, which the console then displayed as 05:00 ET — four hours wrong,
+ * every entry, in the one tile whose whole job is telling Billy what time
+ * something is.
  */
 function parseIcsDate(value: string): { iso: string; allDay: boolean } | null {
   const date = /^(\d{4})(\d{2})(\d{2})$/.exec(value);
   if (date) {
+    // An all-day event has no clock reading to convert; it is that calendar
+    // date and nothing else. Anchoring it at midnight UTC keeps it on the
+    // right date everywhere, which shifting it into Eastern would not.
     return { iso: `${date[1]}-${date[2]}-${date[3]}T00:00:00Z`, allDay: true };
   }
-  const stamp = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/.exec(value);
+  const stamp = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/.exec(value);
   if (stamp) {
+    const [, y, mo, d, h, mi, sec, zulu] = stamp;
+    if (zulu === 'Z') {
+      return { iso: `${y}-${mo}-${d}T${h}:${mi}:${sec}Z`, allDay: false };
+    }
     return {
-      iso: `${stamp[1]}-${stamp[2]}-${stamp[3]}T${stamp[4]}:${stamp[5]}:${stamp[6]}Z`,
+      iso: wallTimeToUtc(+y!, +mo!, +d!, +h!, +mi!, +sec!),
       allDay: false,
     };
   }
   return null;
+}
+
+/**
+ * A wall-clock reading in `DISPLAY_ZONE` → the UTC instant it names.
+ *
+ * Guess that the reading is already UTC, ask the zone what clock that instant
+ * shows, and subtract the difference. Two format calls, no dependency, and DST
+ * is handled because the offset is looked up at that date rather than assumed.
+ *
+ * The one hour a year that a wall-clock reading is ambiguous — the autumn
+ * repeat — resolves to the first of the two. Nothing here is worth more
+ * machinery than that.
+ */
+function wallTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): string {
+  const asUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const shown = zoneParts(new Date(asUtc));
+  const shownAsUtc = Date.UTC(
+    shown.year,
+    shown.month - 1,
+    shown.day,
+    shown.hour,
+    shown.minute,
+    shown.second,
+  );
+  return new Date(asUtc - (shownAsUtc - asUtc)).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+/** What clock `DISPLAY_ZONE` shows at a given instant. */
+function zoneParts(at: Date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: DISPLAY_ZONE,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(at);
+
+  const read = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? '0');
+  // en-US with hour12:false renders midnight as 24; Date.UTC wants 0.
+  const hour = read('hour') % 24;
+  return {
+    year: read('year'),
+    month: read('month'),
+    day: read('day'),
+    hour,
+    minute: read('minute'),
+    second: read('second'),
+  };
 }
 
 /** Map a title onto a project slug, so events land on the right page. */
