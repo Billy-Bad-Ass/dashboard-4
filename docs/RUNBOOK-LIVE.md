@@ -6,7 +6,14 @@ because each one needs either a secret nobody should hand an agent or a
 judgement nobody should delegate.
 
 `trading-3` is deliberately absent. It is being worked separately and has no
-live-money step to take.
+live-money step to take — its own `SETUP.md` is down to two items, the
+Databento account and an optional research token.
+
+**Start here.** Two token grants unblock most of what follows, and one of them
+is the fleet blocker below: `notes/2026-08-26-ops-tokens.md` in
+`Billy-Bad-Ass/Code`. Neither token is ever handed to an assistant — both live
+as repository secrets and are used by a workflow that can be read before it
+runs.
 
 ## The rails, first
 
@@ -42,8 +49,11 @@ configuration choice.
    npm run stripe:sync
    STRIPE_SYNC_CONFIRM=yes npm run stripe:sync -- --apply
    ```
-2. `npm run pdf:upload` — and treat it as part of **every** deploy. A deploy
-   without it takes the money and then 500s on the download.
+2. ✅ **Done — `pdf:upload` is enforced by CI.** `deploy.yml` runs
+   `pdf:build` → `pdf:check` → `pdf:upload` → `verify-r2-downloads` on every
+   deploy, so the failure this step warned about — taking the money and then
+   500ing on the download — cannot happen by forgetting. Verified 2026-08-26.
+   Kept as a closed item so nobody re-adds it as a manual chore.
 3. Create the live webhook at `https://guides.bbanetwork.org/api/stripe/webhook`
    and set `STRIPE_WEBHOOK_SECRET` to that endpoint's secret. The secret is
    per-endpoint; the test-mode one will not work.
@@ -62,19 +72,35 @@ for is the worst kind of made-up number — it is one a customer acts on.
 
 ## dashboard-4 — this dashboard
 
-1. **`DASHBOARD_TOKEN` first**, before the Worker is publicly reachable:
+1. ✅ **Done — `DASHBOARD_TOKEN` is set.** Verified 2026-08-26 from a runner
+   log: `DASHBOARD_URL`, `DASHBOARD_TOKEN`, `CF_ACCESS_CLIENT_ID` and
+   `CF_ACCESS_CLIENT_SECRET` are all present as repository secrets, and the
+   service token's shape checks out (39 and 64 characters, id ending
+   `.access`). Regenerating one, if ever needed:
    ```bash
    openssl rand -hex 32
    ```
-   This page shows revenue, spend and the client list. The order matters.
 2. Then the read-only credentials: `STRIPE_SECRET_KEY` (restricted, read),
    `GITHUB_TOKEN` (fine-grained, read-only), `CLOUDFLARE_API_TOKEN` (Account
    Analytics: Read), `CLOUDFLARE_ACCOUNT_ID`.
 3. Optional: `CALENDAR_ICS_URL` (the private iCal address), and
    `ANTHROPIC_API_KEY` for `/ask`. Unset means the tile says so honestly.
-4. Confirm Cloudflare Access covers `heartbeat.bbanetwork.org` **and** that no
-   unprotected `workers.dev` door is still open. Access is per-hostname: a
-   policy on one name does not follow the site to the other.
+4. 🔴 **Add a Service Auth policy to the Access application** — alongside the
+   existing "Only me" policy, not replacing it. This is the single thing
+   holding the whole agent fleet at `0/10 reporting`.
+
+   The diagnosis, 2026-08-26: every GitHub Actions agent is running and
+   succeeding. Their **read** of `/api/pulse` gets through. Their **POST** to
+   `/api/agent-runs` is answered with a `302` to
+   `cloudflareaccess.com/cdn-cgi/access/login/heartbeat.bbanetwork.org`, so
+   the run is never recorded. The credentials are correct; no policy admits
+   them. Until this exists, nothing anyone merges changes that number.
+
+   `notes/2026-08-26-ops-tokens.md` in `Billy-Bad-Ass/Code` has the token
+   steps that let this be done from a workflow rather than by hand.
+
+5. Confirm no unprotected `workers.dev` door is still open. Access is
+   per-hostname: a policy on one name does not follow the site to the other.
 
 ## growth-os-5 — ads and social
 
