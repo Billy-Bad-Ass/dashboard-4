@@ -1,0 +1,76 @@
+name: Ops · Which Access application is challenging us
+
+# Read-only. Creates nothing, changes nothing, manual only.
+#
+# A service token created seconds earlier, named explicitly by the Service Auth
+# policy on bba-heartbeat, is still answered with a 302 to the Access login
+# page. So the token was never the problem and neither was the policy. Two
+# rounds of changes may have been aimed at an application that is not the one
+# refusing us.
+#
+# The redirect carries a `kid` — the challenging application's key id. This
+# compares it against the `aud` of every Access application in the account.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  look:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Who is challenging the POST?
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+        run: |
+          set -euo pipefail
+          BASE="${DASHBOARD_URL%/}"
+          REDIRECT=$(curl -s -o /dev/null -w '%{redirect_url}' --max-time 20 -X POST "$BASE/api/agent-runs" -H 'content-type: application/json' --data '{}')
+          echo "POST /api/agent-runs redirected to: ${REDIRECT:-<none>}"
+          KID=$(printf '%s' "$REDIRECT" | sed -n 's/.*[?&]kid=\([0-9a-f]*\).*/\1/p')
+          echo "kid = $KID"
+          printf '%s' "$KID" > /tmp/kid
+          GET=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/api/pulse")
+          echo "GET /api/pulse answered $GET  (this has been succeeding all along)"
+
+      - name: Every Access application, with its aud
+        env:
+          CF_TOKEN: ${{ secrets.CF_OPS_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/access"
+          curl -s -H "Authorization: Bearer $CF_TOKEN" "$API/apps?per_page=50" -o /tmp/apps.json
+          if [ "$(jq -r .success /tmp/apps.json)" != "true" ]; then
+            echo "::error title=Cannot list applications::$(jq -c .errors /tmp/apps.json)"
+            exit 1
+          fi
+          KID=$(cat /tmp/kid)
+          echo "Applications in this account:"
+          jq -r --arg kid "$KID" '.result[] | (if .aud == $kid then ">>>" else "   " end) + " name=" + (.name|tostring) + " | id=" + (.id|tostring) + " | aud=" + (.aud//"none"|tostring) + " | type=" + (.type//"?"|tostring) + " | domain=" + (.domain//"none"|tostring)' /tmp/apps.json
+          if jq -e --arg kid "$KID" '.result[] | select(.aud == $kid)' /tmp/apps.json >/dev/null; then
+            echo "The challenging application is the one marked >>> above."
+          else
+            echo "::warning title=Not in this list::No application has aud=$KID. Something this token cannot see is issuing the challenge, and every policy change so far was aimed at the wrong application."
+          fi
+
+      - name: Its policies, in evaluation order
+        env:
+          CF_TOKEN: ${{ secrets.CF_OPS_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/access"
+          KID=$(cat /tmp/kid)
+          APP=$(jq -r --arg kid "$KID" '[.result[] | select(.aud == $kid) | .id][0] // ""' /tmp/apps.json)
+          if [ -z "$APP" ]; then
+            APP=$(jq -r '.result[0].id' /tmp/apps.json)
+            echo "No aud match. Falling back to the first application: $APP"
+          fi
+          curl -s -H "Authorization: Bearer $CF_TOKEN" "$API/apps/$APP/policies" -o /tmp/pol.json
+          if [ "$(jq -r .success /tmp/pol.json)" != "true" ]; then
+            echo "::error title=Cannot list its policies::$(jq -c .errors /tmp/pol.json)"
+            exit 1
+          fi
+          jq -r '.result[] | "[" + (.precedence//0|tostring) + "] " + (.name|tostring) + " decision=" + (.decision|tostring) + " include=" + (.include|tostring)' /tmp/pol.json
