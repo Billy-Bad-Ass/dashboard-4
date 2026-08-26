@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { listClients, loadPipeline, STATUS_META } from '@/lib/crm';
+import { draftCounts, listDrafts } from '@/lib/drafts';
+import { queryOne } from '@/lib/db';
 import { pulse } from '@/lib/heartbeat';
 import { formatMoney } from '@/lib/money';
 import { CATEGORICAL, TAIL } from '@/lib/palette';
@@ -10,6 +12,7 @@ import { Tile } from '@/app/components/Tile';
 import { Icon } from '@/app/components/Icon';
 import { StackedBar } from '@/app/components/Chart';
 import { ClientBoard } from '@/app/components/ClientBoard';
+import { DraftQueue } from '@/app/components/DraftQueue';
 
 export const metadata: Metadata = { title: 'Clients' };
 export const dynamic = 'force-dynamic';
@@ -28,7 +31,14 @@ const STAGE_COLOR: Record<string, string> = {
 };
 
 export default async function ClientsPage() {
-  const [clients, pipeline, snapshot] = await Promise.all([listClients(), loadPipeline(), pulse()]);
+  const [clients, pipeline, snapshot, counts, recentDrafts, drafterRow] = await Promise.all([
+    listClients(),
+    loadPipeline(),
+    pulse(),
+    draftCounts(),
+    listDrafts(undefined, 12),
+    queryOne<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['gmail_drafter_url']),
+  ]);
 
   return (
     <>
@@ -150,6 +160,12 @@ export default async function ClientsPage() {
             </div>
           </div>
         ) : null}
+
+        <DraftQueue
+          counts={counts}
+          recent={recentDrafts}
+          drafterConfigured={Boolean(drafterRow?.value)}
+        />
 
         <ClientBoard clients={clients} />
 
