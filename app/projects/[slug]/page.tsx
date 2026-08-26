@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { projectBySlug, type VitalSpec } from '@/config/portfolio';
 import { pulse, type ProjectPulse } from '@/lib/heartbeat';
+import { listProjectContacts } from '@/lib/crm';
 import { query } from '@/lib/db';
 import { formatMoney, formatPercent } from '@/lib/money';
 import { formatDate, relativeTime } from '@/lib/dates';
@@ -12,6 +13,7 @@ import { Icon } from '@/app/components/Icon';
 import { Chart } from '@/app/components/Chart';
 import { HealthBadge, StageBadge, PulseDot, healthColor } from '@/app/components/Badges';
 import { SpendForm } from '@/app/components/SpendForm';
+import { ContactList } from '@/app/components/ContactList';
 
 /**
  * Rendered on demand, always.
@@ -43,7 +45,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   const state = snapshot.projects.find((p) => p.project.slug === slug);
   if (!state) notFound();
 
-  const [spendRows, revenueRows, history] = await Promise.all([
+  const [spendRows, revenueRows, history, contacts] = await Promise.all([
     query<{
       id: number;
       incurred_on: string;
@@ -72,6 +74,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
       'SELECT metric_key, value_num, captured_at FROM metrics WHERE project_slug = ? ORDER BY captured_at ASC LIMIT 2000',
       [slug],
     ),
+    listProjectContacts(slug),
   ]);
 
   const byMetric = new Map<string, { date: string; value: number }[]>();
@@ -303,6 +306,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
             </div>
           </div>
         ) : null}
+
+        {/* ----------------------------------------------------- contacts -- */}
+        <ContactList
+          emailable={contacts.emailable}
+          missingEmail={contacts.missingEmail}
+          addresses={contacts.addresses}
+          projectName={project.name}
+        />
 
         {/* ---------------------------------------------------- the ledger -- */}
         <div className="grid grid-2">

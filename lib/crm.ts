@@ -399,3 +399,77 @@ export async function deleteDeal(id: number): Promise<void> {
 export async function clientCount(): Promise<number> {
   return (await queryValue<number>('SELECT COUNT(*) FROM clients')) ?? 0;
 }
+
+/**
+ * The people attached to one project, split by whether you can actually reach
+ * them.
+ *
+ * Kept separate from `listClients` because the question a project page asks is
+ * a different question: not "who is in the CRM" but "who could I email about
+ * this project today". A contact with no address on file is not the same as no
+ * contact — it is a person you know about and cannot reach, which is a gap
+ * worth seeing rather than a row worth hiding.
+ */
+export interface EmailableContact extends Client {
+  /** The address, trimmed. Present only on contacts that have one. */
+  emailAddress: string;
+}
+
+export interface ProjectContacts {
+  /** Everyone attached to the project, reachable or not. */
+  all: Client[];
+  /** Those with an address on file, in display order. */
+  emailable: EmailableContact[];
+  /** Attached, but with no address. A gap, not an absence of people. */
+  missingEmail: Client[];
+  /**
+   * Unique addresses, first occurrence wins, compared case-insensitively.
+   * This is what the copy button and the bcc link use — mailing the same
+   * person twice because a row was duplicated is a visible mistake.
+   */
+  addresses: string[];
+}
+
+/**
+ * Split a set of contacts into reachable and not. Pure, so the rule is
+ * testable without a database.
+ */
+export function splitByEmailability(clients: Client[]): ProjectContacts {
+  const emailable: EmailableContact[] = [];
+  const missingEmail: Client[] = [];
+  const addresses: string[] = [];
+  const seen = new Set<string>();
+
+  for (const client of clients) {
+    const address = (client.email ?? '').trim();
+    if (address === '') {
+      missingEmail.push(client);
+      continue;
+    }
+    emailable.push({ ...client, emailAddress: address });
+    const key = address.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      addresses.push(address);
+    }
+  }
+
+  return { all: clients, emailable, missingEmail, addresses };
+}
+
+/**
+ * Contacts for one project.
+ *
+ * Lost contacts are listed last rather than dropped: "we said no to each
+ * other" is information you want while looking at who is left, and silently
+ * shortening the list would make the count disagree with the CRM.
+ */
+export async function listProjectContacts(projectSlug: string): Promise<ProjectContacts> {
+  const clients = await query<Client>(
+    `SELECT * FROM clients
+      WHERE project_slug = ?
+      ORDER BY CASE status WHEN 'lost' THEN 1 ELSE 0 END, heat DESC, name COLLATE NOCASE`,
+    [projectSlug],
+  );
+  return splitByEmailability(clients);
+}
