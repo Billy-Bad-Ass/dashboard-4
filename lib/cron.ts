@@ -23,6 +23,7 @@ import { execute, query, queryOne } from './db';
 import { isoStamp, isoDate, addDays } from './dates';
 import { fetchCalendar } from './connectors/calendar';
 import { syncProspects } from './prospects';
+import { pushQueuedDrafts } from './drafts';
 
 export type Cadence = 'fast' | 'hourly' | 'daily';
 
@@ -69,6 +70,15 @@ export async function runTick(cadence: Cadence): Promise<TickReport> {
     }
     const live = snapshot.connectors.filter((c) => c.status === 'ok').length;
     return `${live}/${snapshot.connectors.length} connectors live`;
+  });
+
+  // Every tick, not just the slow ones: a draft a human is waiting on should
+  // not sit in a queue for an hour because it was written at five past.
+  await step(report, 'drafts', async () => {
+    const result = await pushQueuedDrafts();
+    if (result.problem) return `skipped: ${result.problem}`;
+    if (result.attempted === 0) return 'nothing queued';
+    return `${result.delivered} delivered, ${result.failed} failed, of ${result.attempted}`;
   });
 
   if (cadence === 'hourly' || cadence === 'daily') {
