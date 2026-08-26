@@ -85,21 +85,46 @@ for is the worst kind of made-up number — it is one a customer acts on.
    Analytics: Read), `CLOUDFLARE_ACCOUNT_ID`.
 3. Optional: `CALENDAR_ICS_URL` (the private iCal address), and
    `ANTHROPIC_API_KEY` for `/ask`. Unset means the tile says so honestly.
-4. 🔴 **Add a Service Auth policy to the Access application** — alongside the
-   existing "Only me" policy, not replacing it. This is the single thing
-   holding the whole agent fleet at `0/10 reporting`.
+4. ✅ **Done — the fleet can report.** Verified 2026-08-26 through the real
+   agent path, not by the absence of an error: `agent-heartbeat-watchdog.yml`
+   posted a run and the console answered `201`.
 
-   The diagnosis, 2026-08-26: every GitHub Actions agent is running and
-   succeeding. Their **read** of `/api/pulse` gets through. Their **POST** to
-   `/api/agent-runs` is answered with a `302` to
-   `cloudflareaccess.com/cdn-cgi/access/login/heartbeat.bbanetwork.org`, so
-   the run is never recorded. The credentials are correct; no policy admits
-   them. Until this exists, nothing anyone merges changes that number.
+   It was two faults stacked, which is why four single-cause theories in a row
+   were wrong. The Access Service Auth policy named a service token whose
+   secret nobody held, so the `POST` to `/api/agent-runs` was answered with a
+   `302` to `cloudflareaccess.com/cdn-cgi/access/login/…`; a new token,
+   `bba-ci`, fixed that and propagation took over four minutes rather than the
+   seconds assumed. Underneath it, `DASHBOARD_TOKEN` on the Worker and
+   `DASHBOARD_TOKEN` in this repository were different values. Both are
+   write-only, so they could not be compared — only replaced together, which
+   `ops-rotate-dashboard-token.yml` now does in one job.
 
-   `notes/2026-08-26-ops-tokens.md` in `Billy-Bad-Ass/Code` has the token
-   steps that let this be done from a workflow rather than by hand.
+   The `Only me` policy was never touched, and neither was the `CF2` token.
 
-5. Confirm no unprotected `workers.dev` door is still open. Access is
+5. 🔴 **The fleet blocker is now a Claude credential, and it is one command.**
+   With Access fixed, six agents are still silent — and every model-driven one
+   of them is silent for the same reason. `claude-code-action` validates its
+   environment before it does anything and exits 1 with *"Either
+   ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, or workload identity federation
+   is required"*. Neither secret exists in this repository or in
+   `network-store-2`, so `portfolio-analyst`, `spend-auditor`,
+   `market-researcher`, `revenue-analyst`, `listing-copywriter` and
+   `release-qa` have never once produced anything.
+
+   ```bash
+   claude setup-token
+   ```
+
+   Store the result here as `CLAUDE_CODE_OAUTH_TOKEN`, then run
+   **Ops · Give the other repos the credentials they report with** with
+   `apply=APPLY`; it fans that value out along with the four reporting values.
+   On a Max plan these runs cost nothing, where an API key bills per token.
+
+   Those workflows no longer die on the missing secret: they skip the agent
+   step, say in one line what was lost, and report `skipped` to the console.
+   A skipped agent that says why is a different thing from a red X.
+
+6. Confirm no unprotected `workers.dev` door is still open. Access is
    per-hostname: a policy on one name does not follow the site to the other.
 
 ## growth-os-5 — ads and social
@@ -122,8 +147,10 @@ Keep `DRY_RUN`, `REQUIRE_HUMAN_APPROVAL` and the $25/day cap on throughout.
 1. Add the missing `www.` DNS record. Either a Worker custom domain on
    `bba-network-hub`, or a proxied CNAME plus a redirect rule. The apex itself
    was attached on 2026-08-24.
-2. Set `DASHBOARD_URL`, `DASHBOARD_TOKEN`, `CF_ACCESS_CLIENT_ID` and
-   `CF_ACCESS_CLIENT_SECRET` as Worker secrets, so `link-warden` and
-   `redirect-guard` can report into dashboard-4. Until they can, their runs on
-   the agent console read as never having happened — which is the correct
-   display, and not a useful one.
+2. `DASHBOARD_URL`, `DASHBOARD_TOKEN`, `CF_ACCESS_CLIENT_ID` and
+   `CF_ACCESS_CLIENT_SECRET` as Worker secrets on `bba-network-hub`, so
+   `link-warden` and `redirect-guard` can report into dashboard-4. **No longer
+   a manual step** — dashboard-4's *Ops · Give the other repos the credentials
+   they report with* writes all four with `wrangler secret put`, from the one
+   place the values exist. `src/report.ts` there already reads them and already
+   handles the Access headers; it has simply never had a value to read.

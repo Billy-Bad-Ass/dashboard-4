@@ -158,8 +158,10 @@ export const AGENTS: AgentSpec[] = [
     repo: 'Billy-Bad-Ass/network-store-2',
     projectSlug: 'project-2',
     owns: 'Monthly listing refresh — and an issue instead of a PR when copy overclaims.',
-    schedule: '0 6 1 * *',
-    scheduleHuman: '1st of the month',
+    // Was '0 6 1 * *' here while agent-listing-refresh.yml has always said
+    // '0 9 1 * *'. Three hours of phantom overdue on the 1st of every month.
+    schedule: '0 9 1 * *',
+    scheduleHuman: '1st of the month, 09:00 UTC',
     trigger: 'cron',
     platform: 'github-actions',
     workflow: 'agent-listing-refresh.yml',

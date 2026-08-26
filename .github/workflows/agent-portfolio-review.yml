@@ -106,6 +106,7 @@ jobs:
           started_at: ${{ steps.start.outputs.started }}
           status: >-
             ${{ steps.review.outcome == 'failure' && 'failed'
+            || job.status == 'failure' && 'failed'
             || steps.investigator.outputs.ready != 'true' && 'skipped'
             || 'ok' }}
           summary: >-
