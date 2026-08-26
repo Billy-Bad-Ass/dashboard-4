@@ -107,3 +107,46 @@ test('upcoming filters to the window and keeps events still in progress', () => 
   const narrow = upcoming(events, 2, now);
   assert.ok(!narrow.some((e) => e.uid === 'folded@google.com'));
 });
+
+/**
+ * A floating DTSTART — no trailing Z — is a wall-clock reading in Billy's own
+ * zone, not UTC. Reading it as UTC put every such event four hours early on
+ * the one tile whose job is saying what time something is.
+ */
+const FLOATING_FEED = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:20260826T090000
+UID:floating-summer@google.com
+SUMMARY:Nine in the morning, in August
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261215T090000
+UID:floating-winter@google.com
+SUMMARY:Nine in the morning, in December
+END:VEVENT
+END:VCALENDAR`;
+
+test('a floating time is Eastern, not UTC — summer', () => {
+  const [event] = parseIcs(FLOATING_FEED);
+  // 09:00 EDT is 13:00Z. Read as UTC it would have been 09:00Z, which the
+  // console renders as 05:00 ET.
+  assert.equal(event?.startsAt, '2026-08-26T13:00:00Z');
+  assert.equal(event?.allDay, false);
+});
+
+test('a floating time follows the DST change — winter', () => {
+  const event = parseIcs(FLOATING_FEED)[1];
+  // 09:00 EST is 14:00Z. A fixed -4 offset would have got this an hour wrong.
+  assert.equal(event?.startsAt, '2026-12-15T14:00:00Z');
+});
+
+test('an explicit Z is still absolute and is not shifted', () => {
+  const [event] = parseIcs(FEED);
+  assert.equal(event?.startsAt, '2026-09-01T14:00:00Z');
+});
+
+test('an all-day event keeps its date rather than being shifted into a zone', () => {
+  const allDay = parseIcs(FEED).find((e) => e.allDay);
+  assert.equal(allDay?.startsAt.slice(0, 10), '2026-09-05');
+});

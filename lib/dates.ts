@@ -1,8 +1,24 @@
 /**
  * Date handling. Everything stored is an ISO-8601 UTC string; everything
- * displayed is in the operator's locale. These helpers are the only place that
- * conversion happens.
+ * displayed is Eastern. These helpers are the only place that conversion
+ * happens, which is what makes the rule enforceable rather than aspirational.
+ *
+ * The two halves are deliberate and must not be collapsed:
+ *
+ *  - **Stored UTC.** `isoDate` and `isoStamp` stay UTC because cron
+ *    expressions, GitHub Actions, Cloudflare triggers and every timestamp in
+ *    D1 are UTC. Rewriting stored values into a zone that shifts twice a year
+ *    is how a ledger silently gains and loses an hour.
+ *  - **Displayed Eastern.** Billy is in the United States, Eastern. A time on
+ *    screen with no zone attached is a time somebody will act on at the wrong
+ *    hour, so `formatTime` names the zone rather than leaving it implied.
  */
+
+/** The one timezone anything on screen is allowed to be in. */
+export const DISPLAY_ZONE = 'America/New_York';
+
+/** Shown next to a time so nobody has to guess. */
+export const DISPLAY_ZONE_LABEL = 'ET';
 
 /** `2026-08-23T14:07:00Z` → `2026-08-23`. */
 export function isoDate(d: Date = new Date()): string {
@@ -69,7 +85,7 @@ export function formatDate(iso: string | null | undefined): string {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-    timeZone: 'UTC',
+    timeZone: DISPLAY_ZONE,
   });
 }
 
@@ -77,5 +93,10 @@ export function formatTime(iso: string | null | undefined): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+  const clock = d.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: DISPLAY_ZONE,
+  });
+  return `${clock} ${DISPLAY_ZONE_LABEL}`;
 }
