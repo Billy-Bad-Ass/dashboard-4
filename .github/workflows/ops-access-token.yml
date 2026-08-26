@@ -1,0 +1,194 @@
+name: Ops · Wire the Access service token
+
+# The fleet reads 0/10 because Cloudflare Access answers every agent's POST to
+# /api/agent-runs with a 302 to its login page. Both Service Auth policies on
+# the application name one service token — CF2 — and the runners hold a
+# different one, so nothing is admitted.
+#
+# This creates a fresh token, points the policy at it, stores it, and proves it
+# with a real POST. It is deliberately manual and dry-run by default: it edits
+# a live access-control policy, and that is not something to do on a schedule
+# or by accident.
+#
+# It never prints a secret. The client secret is masked the moment Cloudflare
+# returns it and only ever leaves this job through `gh secret set`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      token_name:
+        description: Name for the new Access service token.
+        required: false
+        default: bba-ci
+      policy_id:
+        description: The Service Auth policy to repoint at the new token.
+        required: false
+        default: 182348cf-e746-42e0-a7b7-efa898d5b26e
+      apply:
+        description: 'Type APPLY to make changes. Anything else plans and stops.'
+        required: false
+        default: ''
+
+concurrency:
+  group: ops-access-token
+  cancel-in-progress: false
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Are the two grants present?
+        run: |
+          set -euo pipefail
+          # Written as if-blocks rather than `[ -z x ] && y`. Under `set -e`
+          # that idiom exits the script the moment a value IS present, which
+          # would report every secret as missing exactly when they are all set.
+          MISSING=""
+          if [ -z "${{ secrets.CF_OPS_TOKEN }}" ]; then MISSING="$MISSING CF_OPS_TOKEN"; fi
+          if [ -z "${{ secrets.GH_SECRETS_TOKEN }}" ]; then MISSING="$MISSING GH_SECRETS_TOKEN"; fi
+          if [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then MISSING="$MISSING CLOUDFLARE_ACCOUNT_ID"; fi
+          if [ -z "${{ secrets.DASHBOARD_URL }}" ]; then MISSING="$MISSING DASHBOARD_URL"; fi
+          if [ -n "$MISSING" ]; then
+            echo "::error title=Missing secrets::Set these repository secrets first:$MISSING"
+            exit 1
+          fi
+          echo "All four are set."
+
+      - name: Does the Cloudflare token work, and what can it do?
+        env:
+          CF_TOKEN: ${{ secrets.CF_OPS_TOKEN }}
+        run: |
+          set -euo pipefail
+          CODE=$(curl -s -o /tmp/verify.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            https://api.cloudflare.com/client/v4/user/tokens/verify)
+          if [ "$CODE" != "200" ] || [ "$(jq -r .success /tmp/verify.json)" != "true" ]; then
+            echo "::error title=Cloudflare token rejected::verify returned $CODE. $(jq -c '.errors // empty' /tmp/verify.json)"
+            exit 1
+          fi
+          echo "Token is valid and active."
+
+      - name: Read the application and its policies
+        id: plan
+        env:
+          CF_TOKEN: ${{ secrets.CF_OPS_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          POLICY_ID: ${{ github.event.inputs.policy_id }}
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/access"
+
+          curl -s -H "Authorization: Bearer $CF_TOKEN" "$API/apps" -o /tmp/apps.json
+          if [ "$(jq -r .success /tmp/apps.json)" != "true" ]; then
+            echo "::error title=Cannot list Access applications::$(jq -c '.errors' /tmp/apps.json)  The token likely lacks Account / Access: Apps and Policies / Edit."
+            exit 1
+          fi
+          echo "Applications this token can see:"
+          jq -r '.result[] | "  \(.name)  —  \(.domain // "no domain")  —  \(.id)"' /tmp/apps.json
+
+          curl -s -H "Authorization: Bearer $CF_TOKEN" "$API/policies/$POLICY_ID" -o /tmp/policy.json
+          if [ "$(jq -r .success /tmp/policy.json)" != "true" ]; then
+            echo "::error title=Cannot read that policy::$(jq -c '.errors' /tmp/policy.json)"
+            exit 1
+          fi
+          echo "Policy to be repointed:"
+          jq -r '.result | "  name: \(.name)\n  decision: \(.decision)\n  include: \(.include | tostring)"' /tmp/policy.json
+
+          DECISION=$(jq -r .result.decision /tmp/policy.json)
+          if [ "$DECISION" != "non_identity" ]; then
+            echo "::error title=Wrong policy::Its decision is '$DECISION', not 'non_identity'. A Service Auth policy is the only kind that admits a service token — repointing anything else would change who can reach the dashboard. Refusing."
+            exit 1
+          fi
+          echo "Confirmed Service Auth. Safe to repoint."
+
+      - name: Stop here unless APPLY was typed
+        if: ${{ github.event.inputs.apply != 'APPLY' }}
+        run: |
+          echo "::notice title=Dry run::Everything above is what would change. Nothing was modified. Re-run with apply=APPLY to go ahead."
+
+      - name: Create the service token, repoint the policy, store the credentials
+        if: ${{ github.event.inputs.apply == 'APPLY' }}
+        env:
+          CF_TOKEN: ${{ secrets.CF_OPS_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          POLICY_ID: ${{ github.event.inputs.policy_id }}
+          TOKEN_NAME: ${{ github.event.inputs.token_name }}
+          GH_TOKEN: ${{ secrets.GH_SECRETS_TOKEN }}
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/access"
+
+          curl -s -X POST -H "Authorization: Bearer $CF_TOKEN" \
+            -H "content-type: application/json" \
+            --data "{\"name\":\"$TOKEN_NAME\"}" \
+            "$API/service_tokens" -o /tmp/token.json
+          if [ "$(jq -r .success /tmp/token.json)" != "true" ]; then
+            echo "::error title=Could not create the service token::$(jq -c '.errors' /tmp/token.json)  The token likely lacks Account / Access: Service Tokens / Edit."
+            exit 1
+          fi
+
+          CLIENT_ID=$(jq -r .result.client_id /tmp/token.json)
+          CLIENT_SECRET=$(jq -r .result.client_secret /tmp/token.json)
+          TOKEN_ID=$(jq -r .result.id /tmp/token.json)
+          # Mask before anything else can echo them.
+          echo "::add-mask::$CLIENT_SECRET"
+          echo "::add-mask::$CLIENT_ID"
+          rm -f /tmp/token.json
+
+          echo "Created '$TOKEN_NAME'. Client id is ${#CLIENT_ID} chars, secret ${#CLIENT_SECRET}."
+          case "$CLIENT_ID" in
+            *.access) echo "Client id ends .access, as expected." ;;
+            *) echo "::error title=Unexpected client id shape::It does not end in .access. Refusing to store it." ; exit 1 ;;
+          esac
+
+          NAME=$(jq -r .result.name /tmp/policy.json)
+          curl -s -X PUT -H "Authorization: Bearer $CF_TOKEN" \
+            -H "content-type: application/json" \
+            --data "$(jq -n --arg n "$NAME" --arg t "$TOKEN_ID" \
+              '{name:$n, decision:"non_identity", include:[{service_token:{token_id:$t}}]}')" \
+            "$API/policies/$POLICY_ID" -o /tmp/updated.json
+          if [ "$(jq -r .success /tmp/updated.json)" != "true" ]; then
+            echo "::error title=Could not update the policy::$(jq -c '.errors' /tmp/updated.json)"
+            exit 1
+          fi
+          echo "Policy '$NAME' now admits '$TOKEN_NAME' and nothing else."
+
+          printf '%s' "$CLIENT_ID"     | gh secret set CF_ACCESS_CLIENT_ID     --repo ${{ github.repository }}
+          printf '%s' "$CLIENT_SECRET" | gh secret set CF_ACCESS_CLIENT_SECRET --repo ${{ github.repository }}
+          echo "Stored both in ${{ github.repository }}."
+
+          echo "$CLIENT_ID"     > /tmp/cid
+          echo "$CLIENT_SECRET" > /tmp/csec
+
+      - name: Prove it with a real POST
+        if: ${{ github.event.inputs.apply == 'APPLY' }}
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+        run: |
+          set -euo pipefail
+          CID=$(cat /tmp/cid); CSEC=$(cat /tmp/csec)
+          echo "::add-mask::$CSEC"; echo "::add-mask::$CID"
+          BASE="${DASHBOARD_URL%/}"
+
+          READ=$(curl -s -o /tmp/post.json -w '%{http_code} %{redirect_url}' --max-time 20 \
+            -X POST "$BASE/api/agent-runs" \
+            -H "content-type: application/json" \
+            -H "authorization: Bearer $DASHBOARD_TOKEN" \
+            -H "CF-Access-Client-Id: $CID" \
+            -H "CF-Access-Client-Secret: $CSEC" \
+            --data '{"agent":"heartbeat-watchdog","status":"ok","trigger":"manual","summary":"Access service token wired and proven."}')
+          CODE="${READ%% *}"; REDIRECT="${READ#* }"
+
+          case "$CODE" in
+            2*) echo "::notice title=Fixed::$BASE/api/agent-runs answered $CODE. The run was recorded. The fleet can report." ;;
+            3*) echo "::error title=Still blocked::$CODE, redirecting to ${REDIRECT:-<none>}. The policy update did not take effect." ; exit 1 ;;
+            401|403) echo "::error title=Refused::$CODE. Access let it through but the dashboard did not — DASHBOARD_TOKEN mismatch. $(head -c 300 /tmp/post.json)" ; exit 1 ;;
+            *) echo "::error title=Unexpected::$CODE. $(head -c 300 /tmp/post.json)" ; exit 1 ;;
+          esac
+
+      - name: Clean up
+        if: always()
+        run: rm -f /tmp/cid /tmp/csec /tmp/token.json
