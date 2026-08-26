@@ -22,6 +22,7 @@ import { pulse, recordHeartbeat, recordMetric } from './heartbeat';
 import { execute, query, queryOne } from './db';
 import { isoStamp, isoDate, addDays } from './dates';
 import { fetchCalendar } from './connectors/calendar';
+import { syncProspects } from './prospects';
 
 export type Cadence = 'fast' | 'hourly' | 'daily';
 
@@ -122,6 +123,17 @@ export async function runTick(cadence: Cadence): Promise<TickReport> {
 
   if (cadence === 'daily') {
     await step(report, 'stripe-reconcile', () => reconcileStripe(snapshot));
+
+    // Prospects published by sitecheck-1's audit engine. It runs on GitHub
+    // Actions because discovery needs the live network; this end just collects
+    // what it left. Before this step existed, a sweep's results sat unread in a
+    // branch for two days, which is indistinguishable from never having run it.
+    await step(report, 'prospects', async () => {
+      const result = await syncProspects();
+      if (result.problem) return `skipped: ${result.problem}`;
+      return `${result.added} new, ${result.skipped} already known, of ${result.fetched} audited`;
+    });
+
     await step(report, 'prune', pruneHistory);
   }
 

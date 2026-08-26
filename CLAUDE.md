@@ -90,6 +90,7 @@ revenue model (a revenue tile on a project with no product is theatre) and write
 | ROI, burn, overhead maths | `lib/finance.ts` |
 | What the heartbeat polls | `lib/heartbeat.ts`, `lib/connectors/` |
 | What the cron does | `lib/cron.ts` |
+| Where prospects come from | `lib/prospects.ts`, synced from sitecheck-1 |
 | The Ask page's tools or system prompt | `lib/ask.ts` |
 | Schema | a new file in `db/migrations/` — never edit an applied one |
 | Colours, spacing, themes | `app/globals.css` (tokens on `:root`) |
