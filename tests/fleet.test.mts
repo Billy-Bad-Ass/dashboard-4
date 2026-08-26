@@ -344,3 +344,33 @@ test('"longest silent" is the longest silence, not the worst severity', () => {
   assert.equal(summary.worst?.agent.name, 'long-gone', 'headline is duration-first');
   assert.ok((summary.worst?.silentForMs ?? 0) > 5 * 86_400_000);
 });
+
+// ------------------------------------------------- what a person reads ------
+
+test('the stamps in a detail line are Eastern and say so', () => {
+  // `{status.detail}` is rendered straight onto the agents page. A bare
+  // `2026-08-24T12:30:00Z` there is four hours away from the hour somebody
+  // acts on, which on this dashboard is the difference between "this morning"
+  // and "not yet".
+  const status = statusFor(agent(), [], NOW);
+  assert.equal(status.state, 'never');
+  assert.match(status.detail, / ET\b/, 'every stamp a person reads carries its zone');
+  assert.doesNotMatch(status.detail, /\d{4}-\d{2}-\d{2}T/, 'no bare ISO stamp reaches the page');
+  // 12:30 UTC is 08:30 in New York in August.
+  assert.match(status.detail, /08:30 ET/);
+});
+
+test('an overdue detail names the fire it missed, in Eastern', () => {
+  const status = statusFor(agent(), [run({ started_at: '2026-08-23T18:31:00Z' })], NOW);
+  assert.equal(status.state, 'overdue');
+  assert.match(status.detail, /08:30 ET/);
+  assert.doesNotMatch(status.detail, /\d{4}-\d{2}-\d{2}T/);
+});
+
+test('the underlying values stay UTC — only the sentence is converted', () => {
+  // The rule is store UTC, display Eastern. A conversion that reached dueAt
+  // itself would put every lateness calculation four hours out.
+  const status = statusFor(agent(), [], NOW);
+  assert.equal(status.dueAt?.toISOString(), '2026-08-24T12:30:00.000Z');
+  assert.equal(status.nextAt?.toISOString(), '2026-08-24T18:30:00.000Z');
+});

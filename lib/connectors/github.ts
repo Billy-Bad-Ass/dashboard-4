@@ -18,6 +18,7 @@
 
 import { cfEnv } from '../db';
 import { attempt, type ConnectorResult } from './types';
+import { formatTime } from '../dates';
 
 export interface RepoPulse {
   repo: string;
@@ -82,7 +83,9 @@ async function gh<T>(path: string): Promise<T | null> {
     if (remaining === '0' || response.status === 429) {
       const reset = response.headers.get('x-ratelimit-reset');
       throw new Error(
-        `rate limited${reset ? ` until ${new Date(Number(reset) * 1000).toISOString()}` : ''}. ` +
+        // Eastern, because this sentence is rendered on the connectors tile
+        // and read by a person deciding whether to wait. See lib/dates.ts.
+        `rate limited${reset ? ` until ${formatTime(new Date(Number(reset) * 1000).toISOString())}` : ''}. ` +
           'Set GITHUB_TOKEN to raise the limit from 60/hour to 5000/hour.',
       );
     }
