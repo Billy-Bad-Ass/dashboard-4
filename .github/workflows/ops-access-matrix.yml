@@ -1,0 +1,58 @@
+name: Ops · Four requests that isolate what Access objects to
+
+# Read-only against the dashboard. Sends four requests that differ in exactly
+# one variable each, so the answer is arithmetic rather than a theory.
+#
+# The suspicion: it was never GET versus POST. The watchdog's probe sends only
+# the two CF-Access headers and gets a 200. The reporting action sends those
+# same two headers PLUS `Authorization: Bearer <DASHBOARD_TOKEN>` and gets a
+# 302. Cloudflare Access inspects the Authorization header, and a bearer token
+# that is not one of its own is not ignored.
+#
+# If that is right, no policy, token or application was ever at fault, and the
+# fix is to stop sending the dashboard's own credential in a header Access
+# claims — not to punch a hole in Access.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Four requests, one variable at a time
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+          CID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CSEC: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          BASE="${DASHBOARD_URL%/}"
+          A=(-H "CF-Access-Client-Id: $CID" -H "CF-Access-Client-Secret: $CSEC")
+          BODY='{"agent":"heartbeat-watchdog","status":"ok","trigger":"manual","summary":"matrix probe"}'
+
+          hit () {
+            local label="$1"; shift
+            local code
+            code=$(curl -s -o /tmp/out -w '%{http_code}' --max-time 20 "$@")
+            printf '%-52s %s\n' "$label" "$code"
+            if [ "${code:0:1}" != "3" ]; then head -c 160 /tmp/out; echo; fi
+          }
+
+          echo "--- GET /api/pulse ---"
+          hit "1. Access headers only" "${A[@]}" "$BASE/api/pulse"
+          hit "2. Access headers + Authorization" "${A[@]}" -H "authorization: Bearer $DASHBOARD_TOKEN" "$BASE/api/pulse"
+
+          echo
+          echo "--- POST /api/agent-runs ---"
+          hit "3. Access headers + Authorization  (today)" -X POST "${A[@]}" -H 'content-type: application/json' -H "authorization: Bearer $DASHBOARD_TOKEN" --data "$BODY" "$BASE/api/agent-runs"
+          hit "4. Access headers, NO Authorization" -X POST "${A[@]}" -H 'content-type: application/json' --data "$BODY" "$BASE/api/agent-runs"
+
+          echo
+          echo "Reading: if 1 is 200 and 2 is 302, Access objects to the Authorization"
+          echo "header and nothing about the method or the policy was ever wrong."
+          echo "If 4 gets past Access (2xx, or a 401 from the dashboard itself rather"
+          echo "than a redirect), the fix is to move the dashboard's credential out of"
+          echo "that header."
