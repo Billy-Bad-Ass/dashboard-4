@@ -80,6 +80,7 @@ jobs:
           started_at: ${{ steps.start.outputs.started }}
           status: >-
             ${{ steps.nudge.outcome == 'failure' && 'failed'
+            || job.status == 'failure' && 'failed'
             || steps.investigator.outputs.ready != 'true' && 'skipped'
             || 'ok' }}
           summary: >-
