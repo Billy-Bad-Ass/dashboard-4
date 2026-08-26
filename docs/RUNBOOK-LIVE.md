@@ -147,10 +147,17 @@ Keep `DRY_RUN`, `REQUIRE_HUMAN_APPROVAL` and the $25/day cap on throughout.
 1. Add the missing `www.` DNS record. Either a Worker custom domain on
    `bba-network-hub`, or a proxied CNAME plus a redirect rule. The apex itself
    was attached on 2026-08-24.
-2. `DASHBOARD_URL`, `DASHBOARD_TOKEN`, `CF_ACCESS_CLIENT_ID` and
-   `CF_ACCESS_CLIENT_SECRET` as Worker secrets on `bba-network-hub`, so
-   `link-warden` and `redirect-guard` can report into dashboard-4. **No longer
-   a manual step** — dashboard-4's *Ops · Give the other repos the credentials
-   they report with* writes all four with `wrangler secret put`, from the one
-   place the values exist. `src/report.ts` there already reads them and already
-   handles the Access headers; it has simply never had a value to read.
+2. ✅ **Done — both of Project 6's checks report.** The four reporting values
+   go to two places there, because the two checks run in two places:
+   Worker secrets on `bba-network-hub` for `link-warden`, and repository
+   secrets for `redirect-guard`. **Not a manual step** — *Ops · Give the other
+   repos the credentials they report with* writes both, from the one place the
+   values exist.
+
+   `redirect-guard` moved back to GitHub Actions on 2026-08-26. It probes the
+   apex, and a Worker cannot fetch the hostname it serves — Cloudflare answers
+   `522` — so it failed all nine of its probes every day from 2026-08-24 and
+   no run in that repository reported anything, so nobody saw. Proved by two
+   requests a second apart: a runner got `200` from the apex while the Worker's
+   own probes got `522`. `link-warden` probes other people's hostnames and
+   stays a Worker cron.
