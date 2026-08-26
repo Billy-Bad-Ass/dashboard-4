@@ -1,0 +1,96 @@
+name: Ops · Rotate DASHBOARD_TOKEN on both sides at once
+
+# Cloudflare Access now lets the agents' POST through — the 302 is gone and
+# /api/agent-runs answers 401 with {"error":"Bad or missing bearer token."}.
+# That 401 is the dashboard's own check, not Access: the DASHBOARD_TOKEN the
+# runners send is not the DASHBOARD_TOKEN the Worker expects.
+#
+# Neither value is readable. A Worker secret and a repository secret are both
+# write-only once set, so the two cannot be compared — only replaced together.
+# This mints one value and writes it to both in the same job, which is the only
+# way to guarantee they match afterwards.
+#
+# Safe to re-run. Rotating a token nothing currently accepts costs nothing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Type APPLY to rotate. Anything else stops.'
+        required: false
+        default: ''
+
+concurrency:
+  group: ops-rotate-dashboard-token
+  cancel-in-progress: false
+
+jobs:
+  rotate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stop unless APPLY was typed
+        if: ${{ github.event.inputs.apply != 'APPLY' }}
+        run: |
+          echo "::notice title=Nothing done::Re-run with apply=APPLY to rotate DASHBOARD_TOKEN on the Worker and in this repository."
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Mint one value and write it to both sides
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_OPS_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GH_TOKEN: ${{ secrets.GH_SECRETS_TOKEN }}
+        run: |
+          set -euo pipefail
+          NEW=$(openssl rand -hex 32)
+          echo "::add-mask::$NEW"
+          echo "Minted a 64-character value."
+
+          # The Worker first. If this write fails the repository secret is left
+          # alone, so the two stay as mismatched as they already are rather
+          # than becoming mismatched in some new way.
+          printf '%s' "$NEW" | npx --yes wrangler@3 secret put DASHBOARD_TOKEN --name bba-heartbeat
+          echo "Worker bba-heartbeat updated."
+
+          printf '%s' "$NEW" | gh secret set DASHBOARD_TOKEN --repo ${{ github.repository }}
+          echo "Repository secret updated."
+
+          printf '%s' "$NEW" > /tmp/newtok
+
+      - name: Prove it end to end
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          CID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CSEC: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          TOK=$(cat /tmp/newtok)
+          echo "::add-mask::$TOK"
+          BASE="${DASHBOARD_URL%/}"
+          # A Worker secret takes a moment to reach every edge location.
+          sleep 20
+          CODE=$(curl -s -o /tmp/out -w '%{http_code}' --max-time 20 -X POST "$BASE/api/agent-runs" \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $TOK" \
+            -H "CF-Access-Client-Id: $CID" \
+            -H "CF-Access-Client-Secret: $CSEC" \
+            --data '{"agent":"heartbeat-watchdog","status":"ok","trigger":"manual","summary":"DASHBOARD_TOKEN rotated and proven end to end."}')
+          echo "POST /api/agent-runs -> $CODE"
+          head -c 300 /tmp/out
+          echo
+          case "$CODE" in
+            2*) echo "::notice title=Recorded::The fleet can report. Every other repository that posts here needs this same value." ;;
+            401) echo "::error title=Still refused::The Worker did not accept the value this job just gave it, so the rotation reached one side only." ; exit 1 ;;
+            3*) echo "::error title=Access again::$CODE. Access is back in the way." ; exit 1 ;;
+            *) echo "::error title=Unexpected::$CODE" ; exit 1 ;;
+          esac
+
+      - name: Clean up
+        if: always()
+        run: rm -f /tmp/newtok
