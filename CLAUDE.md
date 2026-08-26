@@ -3,6 +3,14 @@
 The operating dashboard for the four-project portfolio. Read `docs/AGENTS.md`
 before doing agent work and `docs/DECISIONS.md` before changing architecture.
 
+## Finishing a change here
+
+Billy said it on 2026-08-26: *"Always merge & pull."* A change is not delivered
+while it sits in a pull request. Open it, get it green, merge it, pull `main`
+down, and — because this repo deploys on merge — say whether the deploy
+succeeded. Do not ask permission to open or merge; asking turns a finished job
+into a job waiting on him. The full rulebook is `CLAUDE.md` in `Billy-Bad-Ass/Code`.
+
 ## The one thing to understand first
 
 Unknown and zero are different, and the whole dashboard depends on keeping them
