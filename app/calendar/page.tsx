@@ -4,7 +4,7 @@ import { pulse } from '@/lib/heartbeat';
 import { cfEnv } from '@/lib/db';
 import { PROJECTS } from '@/config/portfolio';
 import { AGENTS } from '@/config/agents';
-import { formatDate, formatTime, relativeTime, isoDate, addDays } from '@/lib/dates';
+import { formatDate, formatTime, relativeTime, easternDate, addDays } from '@/lib/dates';
 import { PageHead } from '@/app/components/PageHead';
 import { Icon } from '@/app/components/Icon';
 
@@ -16,17 +16,19 @@ export default async function CalendarPage() {
   const account = cfEnv()?.CALENDAR_ACCOUNT ?? 'bbacentralworkspace@gmail.com';
   const connector = snapshot.connectors.find((c) => c.name === 'Calendar');
 
-  // Group by day so the page reads as a diary rather than a list.
+  // Group by day so the page reads as a diary rather than a list — by the
+  // Eastern day, because slicing the ISO string gives the UTC one and files
+  // a nine-in-the-evening event under tomorrow.
   const byDay = new Map<string, typeof snapshot.events>();
   for (const event of snapshot.events) {
-    const day = event.startsAt.slice(0, 10);
+    const day = easternDate(event.startsAt);
     const list = byDay.get(day) ?? [];
     list.push(event);
     byDay.set(day, list);
   }
 
-  const today = isoDate();
-  const tomorrow = isoDate(addDays(new Date(), 1));
+  const today = easternDate();
+  const tomorrow = easternDate(addDays(new Date(), 1));
 
   return (
     <>

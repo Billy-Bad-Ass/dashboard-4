@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PROJECTS } from '@/config/portfolio';
 import { parseMoney, formatMoney, symbolFor, DEFAULT_CURRENCY } from '@/lib/money';
-import { isoDate } from '@/lib/dates';
+import { easternDate } from '@/lib/dates';
 import { Icon } from './Icon';
 
 const CATEGORIES = [
@@ -131,7 +131,7 @@ export function SpendForm({ defaultProject }: { defaultProject?: string }) {
         </div>
         <div className="field">
           <label htmlFor="spend-date">Date</label>
-          <input id="spend-date" name="incurred_on" type="date" defaultValue={isoDate()} />
+          <input id="spend-date" name="incurred_on" type="date" defaultValue={easternDate()} />
         </div>
         <div className="field">
           <label htmlFor="spend-recurrence">Recurs</label>
