@@ -22,7 +22,7 @@
  * cases, which is what a working calendar contains.
  */
 
-import { DISPLAY_ZONE } from '../dates';
+import { wallTimeToUtc } from '../dates';
 
 import { cfEnv } from '../db';
 import { attempt, unconfigured, type ConnectorResult } from './types';
@@ -100,64 +100,6 @@ function parseIcsDate(value: string): { iso: string; allDay: boolean } | null {
     };
   }
   return null;
-}
-
-/**
- * A wall-clock reading in `DISPLAY_ZONE` → the UTC instant it names.
- *
- * Guess that the reading is already UTC, ask the zone what clock that instant
- * shows, and subtract the difference. Two format calls, no dependency, and DST
- * is handled because the offset is looked up at that date rather than assumed.
- *
- * The one hour a year that a wall-clock reading is ambiguous — the autumn
- * repeat — resolves to the first of the two. Nothing here is worth more
- * machinery than that.
- */
-function wallTimeToUtc(
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  minute: number,
-  second: number,
-): string {
-  const asUtc = Date.UTC(year, month - 1, day, hour, minute, second);
-  const shown = zoneParts(new Date(asUtc));
-  const shownAsUtc = Date.UTC(
-    shown.year,
-    shown.month - 1,
-    shown.day,
-    shown.hour,
-    shown.minute,
-    shown.second,
-  );
-  return new Date(asUtc - (shownAsUtc - asUtc)).toISOString().replace(/\.\d{3}Z$/, 'Z');
-}
-
-/** What clock `DISPLAY_ZONE` shows at a given instant. */
-function zoneParts(at: Date) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: DISPLAY_ZONE,
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(at);
-
-  const read = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? '0');
-  // en-US with hour12:false renders midnight as 24; Date.UTC wants 0.
-  const hour = read('hour') % 24;
-  return {
-    year: read('year'),
-    month: read('month'),
-    day: read('day'),
-    hour,
-    minute: read('minute'),
-    second: read('second'),
-  };
 }
 
 /** Map a title onto a project slug, so events land on the right page. */

@@ -20,6 +20,77 @@ export const DISPLAY_ZONE = 'America/New_York';
 /** Shown next to a time so nobody has to guess. */
 export const DISPLAY_ZONE_LABEL = 'ET';
 
+/** What clock `DISPLAY_ZONE` shows at a given instant. */
+export function zoneParts(at: Date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: DISPLAY_ZONE,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(at);
+
+  const read = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? '0');
+  // en-US with hour12:false renders midnight as 24; Date.UTC wants 0.
+  return {
+    year: read('year'),
+    month: read('month'),
+    day: read('day'),
+    hour: read('hour') % 24,
+    minute: read('minute'),
+    second: read('second'),
+  };
+}
+
+/**
+ * The Eastern calendar date an instant falls on: `2026-08-26T01:00:00Z` →
+ * `2026-08-25`, because 01:00Z is nine in the evening the day before.
+ *
+ * Slicing the first ten characters off an ISO string gives the *UTC* date, and
+ * for the five hours a night when those two disagree it files an evening event
+ * under tomorrow and pre-fills a form with a day that has not started.
+ */
+export function easternDate(input: string | Date = new Date()): string {
+  const at = typeof input === 'string' ? new Date(input) : input;
+  if (Number.isNaN(at.getTime())) return '';
+  const p = zoneParts(at);
+  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+}
+
+/**
+ * A wall-clock reading in `DISPLAY_ZONE` → the UTC instant it names.
+ *
+ * Guess that the reading is already UTC, ask the zone what clock that instant
+ * shows, and subtract the difference. Two format calls, no dependency, and DST
+ * is handled because the offset is looked up at that date rather than assumed.
+ *
+ * The one hour a year a wall-clock reading is ambiguous — the autumn repeat —
+ * resolves to the first of the two.
+ */
+export function wallTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): string {
+  const asUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const shown = zoneParts(new Date(asUtc));
+  const shownAsUtc = Date.UTC(
+    shown.year,
+    shown.month - 1,
+    shown.day,
+    shown.hour,
+    shown.minute,
+    shown.second,
+  );
+  return new Date(asUtc - (shownAsUtc - asUtc)).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
 /** `2026-08-23T14:07:00Z` → `2026-08-23`. */
 export function isoDate(d: Date = new Date()): string {
   return d.toISOString().slice(0, 10);
@@ -76,9 +147,37 @@ function plural(unit: string, n: number): string {
   return n === 1 ? unit : `${unit}s`;
 }
 
-/** Human date for display: `23 Aug 2026`. */
+/**
+ * Human date for display: `23 Aug 2026`.
+ *
+ * Two different things arrive here and they must not be treated alike:
+ *
+ *  - **An instant** (`2026-08-26T01:00:00Z`) is a moment in time, and the day
+ *    it falls on depends on where you are standing. Converted to Eastern.
+ *  - **A calendar date** (`2026-08-26`) is a ledger date, an invoice date, a
+ *    next-action date. It names a day and carries no clock reading, so there
+ *    is nothing to convert — and converting it anyway moves it. `new Date()`
+ *    reads a bare date as midnight UTC, which in Eastern is 8pm the evening
+ *    before, so every stored date would render a day early.
+ *
+ * That second case is not hypothetical: it shipped, and put every row on the
+ * finance page one day back.
+ */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
+
+  const bare = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (bare) {
+    // Render the day it names, in no zone at all.
+    const named = new Date(Date.UTC(+bare[1]!, +bare[2]! - 1, +bare[3]!));
+    return named.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+  }
+
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('en-GB', {

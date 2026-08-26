@@ -20,7 +20,7 @@ import {
   type ClientWithDeals,
 } from '@/lib/crm';
 import { parseMoney, symbolFor, DEFAULT_CURRENCY } from '@/lib/money';
-import { isoDate } from '@/lib/dates';
+import { easternDate } from '@/lib/dates';
 import { Icon } from './Icon';
 
 const KINDS = ['email', 'call', 'meeting', 'proposal', 'note'] as const;
@@ -226,7 +226,7 @@ export function ClientDetail({ client }: { client: ClientWithDeals }) {
           </div>
           <div className="field" style={{ maxWidth: 150 }}>
             <label htmlFor="i-date">When</label>
-            <input id="i-date" name="occurred_on" type="date" defaultValue={isoDate()} />
+            <input id="i-date" name="occurred_on" type="date" defaultValue={easternDate()} />
           </div>
         </div>
         <div className="field">
