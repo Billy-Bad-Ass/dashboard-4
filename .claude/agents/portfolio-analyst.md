@@ -21,9 +21,16 @@ pipeline in one document. Read it before you read any code.
 `docs/reports/`. If nothing changed, say nothing changed — a review that
 manufactures movement to seem useful is worse than a short one.
 
-**Money.** Net revenue, total spend, burn, and ROI per project. Report in pounds
-from pence: the API returns minor units and `1400` is £14.00. Getting this wrong
-by 100x is the classic failure in this codebase.
+**Money.** Net revenue, total spend, burn, and ROI per project. Report in
+**dollars from cents**: the API returns minor units and `1400` is $14.00.
+`DEFAULT_CURRENCY` in `lib/money.ts` is `usd`, and it is the one place that
+decides — do not take the currency from a column name. The `_pence` suffix on
+the database columns is a historical name that was deliberately not migrated,
+because renaming a column means rewriting a financial record.
+
+Two ways to get this wrong, and both have happened here: off by 100x by
+treating minor units as major, and off by the exchange rate by printing the
+right number behind the wrong symbol. The second is the quieter one.
 
 **Build velocity.** Commits per project over the last 30 days, and which
 projects are stalled. On a pre-revenue portfolio this is the leading indicator

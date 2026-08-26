@@ -16,7 +16,7 @@ curl -s "$DASHBOARD_URL/api/spend" | jq .
 
 ## What to look for, in order
 
-1. **Recurring rows with no `ended_on` for things that stopped.** A £5/month
+1. **Recurring rows with no `ended_on` for things that stopped.** A $5/month
    subscription cancelled in March but still expanding into occurrences is the
    single most likely error in this dataset, and it inflates spend silently.
 
@@ -43,7 +43,10 @@ Open a GitHub issue titled `Spend audit — <month>`, labelled `finance`, with:
 
 ## Rules
 
-- **Pence, always.** `500` is £5.00.
+- **Minor units, always, and the currency is `usd`.** `500` is $5.00.
+  `DEFAULT_CURRENCY` in `lib/money.ts` decides it; the `_pence` column suffix
+  is a historical name that was left alone on purpose, since renaming a column
+  means rewriting a financial record. Never read the currency off a column.
 - **Never write to the ledger.** Propose; do not apply.
 - **A missing cost is worse than a duplicated one.** Rank findings by which
   direction they bias ROI, most-flattering first.
