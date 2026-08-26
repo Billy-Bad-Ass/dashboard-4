@@ -193,12 +193,15 @@ export const AGENTS: AgentSpec[] = [
     workflow: 'refresh.yml',
     icon: 'rotate',
   },
-  // Project 6's two checks are Cloudflare Cron Triggers on the bba-network-hub
-  // Worker rather than GitHub Actions — the first agents in this register with
-  // no workflow file and no Actions page. They got away with being a Worker
+  // Project 6's checks were both Cloudflare Cron Triggers on the
+  // bba-network-hub Worker — the first agents in this register with no
+  // workflow file and no Actions page. They got away with being a Worker
   // because both are pure fetch-and-compare: no model in the loop and no
   // GitHub API call, so neither needs a credential a Worker cannot safely
   // hold. See docs/DECISIONS.md for why most of Project 4's cannot follow.
+  //
+  // One of them came back on 2026-08-26. What a Worker cannot do is fetch the
+  // hostname it serves, and redirect-guard's whole subject is that hostname.
   {
     name: 'link-warden',
     scope: 'project',
@@ -225,8 +228,13 @@ export const AGENTS: AgentSpec[] = [
     schedule: '40 7 * * *',
     scheduleHuman: 'Daily 07:40 UTC',
     trigger: 'cron',
-    platform: 'cloudflare-cron',
-    workflow: 'wrangler.jsonc',
+    // Back on GitHub Actions since 2026-08-26, alone among Project 6's two.
+    // It probes the apex, and a Worker cannot fetch the hostname it serves —
+    // Cloudflare answers 522 — so it failed every one of its nine probes every
+    // day from 2026-08-24 and nothing reported it. link-warden probes other
+    // people's hostnames and stays a Worker cron. See web-6/docs/AGENTS.md.
+    platform: 'github-actions',
+    workflow: 'agent-redirect-guard.yml',
     icon: 'shield-halved',
   },
 ];
