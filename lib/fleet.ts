@@ -17,6 +17,7 @@
 
 import { AGENTS, type AgentSpec } from '@/config/agents';
 import type { AgentRun } from './heartbeat';
+import { formatDate, formatTime } from './dates';
 import { graceFor, nextFire, previousFire, STALLED_AFTER_MS } from './schedule';
 
 export type FleetState =
@@ -253,6 +254,20 @@ function isTerminal(run: AgentRun): boolean {
   return run.status === 'ok' || run.status === 'failed' || run.status === 'skipped';
 }
 
-function iso(d: Date): string {
-  return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+/**
+ * A stamp for a person to read, which means Eastern and says so.
+ *
+ * These strings are rendered straight onto the agents page — `{status.detail}`
+ * — so they are read by a human deciding whether something is broken, not
+ * compared by a machine. A bare `2026-08-01T09:00:00Z` in that position is a
+ * time somebody acts on at the wrong hour; four hours' difference is the
+ * difference between "this morning" and "not yet".
+ *
+ * Everything underneath stays UTC and must: the cron expressions in
+ * `config/agents.ts`, the `started_at` column, the arithmetic in this module.
+ * The conversion happens here, at the edge, and nowhere else. See lib/dates.ts.
+ */
+function iso(at: Date | string): string {
+  const value = typeof at === 'string' ? at : at.toISOString();
+  return `${formatDate(value)}, ${formatTime(value)}`;
 }
