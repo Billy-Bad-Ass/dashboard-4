@@ -206,6 +206,13 @@ export function ClientBoard({ clients }: { clients: ClientWithDeals[] }) {
                   {client.company ? (
                     <div className="tiny faint">{client.company}</div>
                   ) : null}
+                  {/* The address itself, not just a button that knows it —
+                      "who can I email" is a question you answer by reading. */}
+                  {client.email ? (
+                    <a href={`mailto:${client.email}`} className="tiny mono">
+                      {client.email}
+                    </a>
+                  ) : null}
                 </div>
                 <Heat value={client.heat} />
               </div>
