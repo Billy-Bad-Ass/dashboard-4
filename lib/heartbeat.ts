@@ -219,8 +219,12 @@ export function assessHealth(
   const automated =
     repo.botCommitCount > 0 ? ` Its automation is still running (${repo.botCommitCount} commits).` : '';
 
+  // Named, because "CI is red" is not actionable and was once not even true.
+  // The verdict comes from the runs a push to the default branch produced, so
+  // whichever workflow this is, it is one the branch itself broke.
   if (repo.ciStatus === 'failure') {
-    return { health: 'stalled', reason: 'CI is red on the default branch.' };
+    const which = repo.ciWorkflow ? ` (${repo.ciWorkflow})` : '';
+    return { health: 'stalled', reason: `CI is red on ${repo.defaultBranch}${which}.` };
   }
   if (daysSinceCommit === null || daysSinceCommit > 21) {
     return {

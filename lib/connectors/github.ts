@@ -38,9 +38,16 @@ export interface RepoPulse {
   lastAnyCommitAt: string | null;
   openIssues: number;
   openPulls: number;
-  /** Conclusion of the most recent CI run: success | failure | null. */
+  /**
+   * The default branch's own verdict: the conclusion of the runs a push to it
+   * produced, at its head commit. success | failure | null, plus whatever else
+   * GitHub concludes. Null means no push has built the branch — unknown, which
+   * is not the same as green.
+   */
   ciStatus: string | null;
   ciUrl: string | null;
+  /** Which workflow that verdict came from. Said out loud wherever it is used. */
+  ciWorkflow: string | null;
   /** Bytes. A repo of a few hundred bytes is a README and nothing else. */
   sizeKb: number;
   language: string | null;
@@ -136,8 +143,70 @@ function isAutomated(c: CommitResponse): boolean {
     : /github-actions\[bot\]@/.test(email) || /\[bot\]$/.test(name);
 }
 
+export interface WorkflowRun {
+  /** Identifies the workflow, not the run. Two runs sharing it are re-runs. */
+  workflow_id: number;
+  name: string | null;
+  head_sha: string;
+  status: string;
+  conclusion: string | null;
+  html_url: string;
+}
+
 interface RunsResponse {
-  workflow_runs: { conclusion: string | null; status: string; html_url: string }[];
+  workflow_runs: WorkflowRun[];
+}
+
+/**
+ * Conclusions that mean the branch did not build. Used only to decide which
+ * run to report when several ran against the same commit — the conclusion
+ * itself is passed through untouched, so the dashboard shows `timed_out`
+ * rather than flattening it to `failure`.
+ */
+const RED = new Set(['failure', 'timed_out', 'startup_failure']);
+
+export interface CiVerdict {
+  status: string | null;
+  url: string | null;
+  workflow: string | null;
+}
+
+/**
+ * Reduce a branch's push runs to one verdict.
+ *
+ * Expects the runs GitHub returns for `?branch=<default>&event=push`, newest
+ * first. Three rules, in order:
+ *
+ *  1. Only the head commit counts. A red run against a commit two pushes ago
+ *     was either fixed or already reported, and judging on it would keep a
+ *     project red past the push that repaired it.
+ *  2. Per workflow, the newest run wins. A re-run is the author saying the
+ *     earlier attempt does not stand.
+ *  3. Red beats amber beats green. If anything failed at that commit the
+ *     branch is red, whichever workflow got there last.
+ */
+export function assessCi(runs: WorkflowRun[] | null | undefined): CiVerdict {
+  const newest = runs?.[0];
+  if (!newest) return { status: null, url: null, workflow: null };
+
+  const current = new Map<number, WorkflowRun>();
+  for (const run of runs!) {
+    if (run.head_sha !== newest.head_sha) continue;
+    if (!current.has(run.workflow_id)) current.set(run.workflow_id, run);
+  }
+
+  const at = [...current.values()];
+  const failed = at.find((r) => r.conclusion !== null && RED.has(r.conclusion));
+  if (failed) return { status: failed.conclusion, url: failed.html_url, workflow: failed.name };
+
+  const running = at.find((r) => r.status !== 'completed');
+  if (running) return { status: running.status, url: running.html_url, workflow: running.name };
+
+  return {
+    status: newest.conclusion ?? newest.status,
+    url: newest.html_url,
+    workflow: newest.name,
+  };
 }
 
 export async function fetchRepoPulse(
@@ -160,6 +229,7 @@ export async function fetchRepoPulse(
         openPulls: 0,
         ciStatus: null,
         ciUrl: null,
+        ciWorkflow: null,
         sizeKb: 0,
         language: null,
         pushedAt: null,
@@ -170,7 +240,20 @@ export async function fetchRepoPulse(
     const [commits, pulls, runs] = await Promise.all([
       gh<CommitResponse[]>(`/repos/${repo}/commits?since=${since}&per_page=100`),
       gh<unknown[]>(`/repos/${repo}/pulls?state=open&per_page=100`),
-      gh<RunsResponse>(`/repos/${repo}/actions/runs?per_page=1`),
+      // Scoped to the default branch, and to the runs a push to it produced.
+      // Both halves are load-bearing. This was `?per_page=1` — the newest run
+      // in the repo, any workflow, any branch — so a Monday-morning scheduled
+      // agent job or a run on somebody's pull request branch could report a
+      // project stalled while its default branch built clean. Project-2 spent
+      // a morning red for exactly that reason, under a verdict that read "CI
+      // is red on the default branch" when CI was green.
+      //
+      // 20 rather than 1 because a commit can trigger several workflows, and
+      // one of them failing is what matters, not which finished last.
+      gh<RunsResponse>(
+        `/repos/${repo}/actions/runs` +
+          `?branch=${encodeURIComponent(meta.default_branch)}&event=push&per_page=20`,
+      ),
     ]);
 
     // Split the window before anything reads a count. A project whose cron
@@ -179,7 +262,7 @@ export async function fetchRepoPulse(
     const human = (commits ?? []).filter((c) => !isAutomated(c));
     const bots = (commits ?? []).length - human.length;
     const latest = human[0];
-    const run = runs?.workflow_runs?.[0];
+    const ci = assessCi(runs?.workflow_runs);
     const pullCount = pulls?.length ?? 0;
 
     return {
@@ -195,8 +278,9 @@ export async function fetchRepoPulse(
       // the only way to get the number a human means by "open issues".
       openIssues: Math.max(0, meta.open_issues_count - pullCount),
       openPulls: pullCount,
-      ciStatus: run ? (run.conclusion ?? run.status) : null,
-      ciUrl: run?.html_url ?? null,
+      ciStatus: ci.status,
+      ciUrl: ci.url,
+      ciWorkflow: ci.workflow,
       sizeKb: meta.size,
       language: meta.language,
       pushedAt: meta.pushed_at,
