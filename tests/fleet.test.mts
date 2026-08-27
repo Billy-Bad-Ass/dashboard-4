@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { graceFor, nextFire, parseCron, previousFire } from '../lib/schedule.ts';
 import { assessFleet, statusFor, isSilent } from '../lib/fleet.ts';
 import { AGENTS, type AgentSpec } from '../config/agents.ts';
+import { ICONS } from '../lib/icons.generated.ts';
 import type { AgentRun } from '../lib/heartbeat.ts';
 
 function at(iso: string): Date {
@@ -373,4 +374,50 @@ test('the underlying values stay UTC — only the sentence is converted', () => 
   const status = statusFor(agent(), [], NOW);
   assert.equal(status.dueAt?.toISOString(), '2026-08-24T12:30:00.000Z');
   assert.equal(status.nextAt?.toISOString(), '2026-08-24T18:30:00.000Z');
+});
+
+// ------------------------------------------------------------- register ---
+
+/**
+ * The register describes agents to a renderer that cannot answer back.
+ *
+ * `icon` is looked up in ICONS by name, and a name that is not there renders
+ * as nothing — no error, no fallback, no missing-image glyph. `order-fulfilment`
+ * was added carrying `truck-fast`, which is not one of the 61 marks in the set,
+ * and the only symptom would have been a blank space on the agents page.
+ *
+ * `schedule` has the same shape of failure one level down: it is what decides
+ * whether an agent is late, so an expression the parser cannot read silently
+ * costs the console its ability to say an agent has gone quiet.
+ */
+test('every registered agent names an icon that exists', () => {
+  const known = new Set(Object.keys(ICONS));
+  for (const agent of AGENTS) {
+    assert.ok(
+      known.has(agent.icon),
+      `${agent.name} uses icon "${agent.icon}", which is not in lib/icons.generated.ts`,
+    );
+  }
+});
+
+test('every registered agent has a schedule the parser can read', () => {
+  for (const agent of AGENTS) {
+    if (agent.trigger !== 'cron') continue;
+    assert.doesNotThrow(
+      () => parseCron(agent.schedule),
+      `${agent.name} has an unparseable schedule: ${agent.schedule}`,
+    );
+  }
+});
+
+test('every registered agent names a repository in this portfolio', () => {
+  // A typo here points the console's "open the Actions page" link at a 404,
+  // which reads as the agent being broken rather than the register being wrong.
+  for (const agent of AGENTS) {
+    assert.match(
+      agent.repo,
+      /^Billy-Bad-Ass\/[A-Za-z0-9._-]+$/,
+      `${agent.name} has a malformed repo: ${agent.repo}`,
+    );
+  }
 });

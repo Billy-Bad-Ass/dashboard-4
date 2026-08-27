@@ -193,6 +193,39 @@ export const AGENTS: AgentSpec[] = [
     workflow: 'refresh.yml',
     icon: 'rotate',
   },
+  // The only agent in this register standing between a paying customer and the
+  // thing they paid for.
+  //
+  // The Website Health Check sells through a Stripe Payment Link and has no
+  // webhook, by design. So nothing pushes an order anywhere: fulfilment polls
+  // Stripe and emails the report. If it stops, a customer has been charged
+  // $100 and receives nothing — and Stripe shows no failed delivery, because
+  // there was never anything to deliver to.
+  //
+  // It was missing from this register until 2026-08-27 and reported nothing at
+  // all. It had been running at one- to two-hour intervals against a ten-minute
+  // schedule, and then stopped for 22 hours. That was visible only by opening
+  // its Actions page — which is exactly what this console exists so nobody has
+  // to do. Its schedule is now every 20 minutes, which GitHub honours more
+  // nearly than every 10.
+  {
+    name: 'order-fulfilment',
+    scope: 'project',
+    repo: 'Billy-Bad-Ass/sitecheck-1',
+    projectSlug: 'project-1',
+    owns:
+      'Polls Stripe for paid Website Health Checks and emails each report. The only delivery ' +
+      'path for the one product taking live money — there is no webhook behind it.',
+    schedule: '*/20 * * * *',
+    scheduleHuman: 'Every 20 minutes',
+    trigger: 'cron',
+    platform: 'github-actions',
+    workflow: 'fulfil.yml',
+    // envelope, not a delivery-van glyph: the icon set is the 61 marks in
+    // lib/icons.generated.ts, and a name outside it renders as nothing at all.
+    // Emailing the report is also the literal act this agent performs.
+    icon: 'envelope',
+  },
   // Project 6's checks were both Cloudflare Cron Triggers on the
   // bba-network-hub Worker — the first agents in this register with no
   // workflow file and no Actions page. They got away with being a Worker
