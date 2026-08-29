@@ -5,9 +5,10 @@ or a decision**. None of it is blocked on code. An agent cannot do any of it,
 because each one needs either a secret nobody should hand an agent or a
 judgement nobody should delegate.
 
-`trading-3` is deliberately absent. It is being worked separately and has no
-live-money step to take — its own `SETUP.md` is down to two items, the
-Databento account and an optional research token.
+`trading-3` (Hardstop) is gone, not merely absent. The repository was deleted
+on 2026-08-29 and the project came out of `config/portfolio.ts` the same day,
+so it has no page and no live-money step. An earlier version of this line said
+it was "being worked separately", which is no longer true of anything.
 
 **Start here.** Two token grants unblock most of what follows, and one of them
 is the fleet blocker below: `notes/2026-08-26-ops-tokens.md` in

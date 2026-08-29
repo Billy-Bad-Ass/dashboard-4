@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseIcs, guessProject, upcoming } from '../lib/connectors/calendar.ts';
+import { PROJECTS } from '../config/portfolio.ts';
 
 /** A feed shaped the way Google actually emits one. */
 const FEED = `BEGIN:VCALENDAR
@@ -87,11 +88,34 @@ test('an empty or malformed feed yields no events rather than throwing', () => {
 
 test('guessProject maps titles onto project slugs', () => {
   assert.equal(guessProject('Project 2 launch review'), 'project-2');
-  assert.equal(guessProject('project-3 kickoff'), 'project-3');
   assert.equal(guessProject('pSEO Forge dataset check'), 'project-1');
   assert.equal(guessProject('Storefront copy pass'), 'project-2');
   assert.equal(guessProject('Heartbeat dashboard review'), 'project-4');
   assert.equal(guessProject('Dentist'), null);
+});
+
+/**
+ * The number is checked against the register, not against a literal range.
+ *
+ * This suite asserted `guessProject('project-3 kickoff') === 'project-3'` until
+ * Hardstop was removed on 2026-08-29. The old `[1-4]` regex was wrong at both
+ * ends: blind to projects 5 and 6, which exist, and willing to name project 3,
+ * which no longer does. An event filed against a slug the register has never
+ * heard of is not an error — it is simply lost, which is worse.
+ */
+test('guessProject only answers with projects the register actually has', () => {
+  for (const project of PROJECTS) {
+    const number = project.slug.replace('project-', '');
+    assert.equal(
+      guessProject(`Project ${number} planning`),
+      project.slug,
+      `every registered project should be reachable by number — ${project.slug} was not`,
+    );
+  }
+
+  // Hardstop's old slug, and a number nothing has ever used.
+  assert.equal(guessProject('project-3 kickoff'), null);
+  assert.equal(guessProject('Project 99 retrospective'), null);
 });
 
 test('upcoming filters to the window and keeps events still in progress', () => {

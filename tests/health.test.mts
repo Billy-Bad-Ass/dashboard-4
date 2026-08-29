@@ -119,11 +119,15 @@ test('a project marked earning with no net revenue is flagged', () => {
 /**
  * A cron must not be able to hide an abandoned project.
  *
- * Hardstop's runner and watchman commit state every few hours. While
+ * Hardstop's runner and watchman committed state every few hours. While
  * `lastCommitAt` counted those, its clock reset before the 21-day staleness
  * rule could ever fire — so the one check meant to catch a project quietly
  * stopping was defeated by the project's own automation, permanently and
  * silently. `lastCommitAt` now means the last commit BY A PERSON.
+ *
+ * Hardstop left the register on 2026-08-29. The rule outlives it: every agent
+ * in the fleet commits on a schedule, so any project they touch could hide the
+ * same way.
  */
 
 test('automation running does not stop a project being reported stalled', () => {

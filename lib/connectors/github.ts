@@ -118,9 +118,12 @@ interface CommitResponse {
  *
  * Three independent signals, because any one of them can be absent: GitHub
  * types the account as a Bot, the login carries the `[bot]` suffix, or the
- * commit is attributed to the shared github-actions noreply address. Hardstop
- * writes as `runner[bot]` and `watchman[bot]` over that shared address, so in
- * practice the last one does most of the work.
+ * commit is attributed to the shared github-actions noreply address. The last
+ * one does most of the work in practice. The case that forced all three was
+ * Hardstop, which wrote as `runner[bot]` and `watchman[bot]` over that shared
+ * address; it was removed from the register on 2026-08-29, but the logic
+ * stays — every agent in the fleet commits the same way, and none of this was
+ * ever specific to one project.
  *
  * Deliberately conservative: an unrecognised author counts as a person. Over-
  * counting humans makes a project look more alive than it is, which is the

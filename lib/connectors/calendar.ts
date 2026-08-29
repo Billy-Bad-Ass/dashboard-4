@@ -25,6 +25,7 @@
 import { wallTimeToUtc } from '../dates';
 
 import { cfEnv } from '../db';
+import { projectBySlug } from '@/config/portfolio';
 import { attempt, unconfigured, type ConnectorResult } from './types';
 
 export interface CalendarEvent {
@@ -102,14 +103,33 @@ function parseIcsDate(value: string): { iso: string; allDay: boolean } | null {
   return null;
 }
 
-/** Map a title onto a project slug, so events land on the right page. */
+/**
+ * Map a title onto a project slug, so events land on the right page.
+ *
+ * Every answer is checked against the register before it is returned, and that
+ * check is the point of this shape. The number used to be matched with a
+ * literal `[1-4]`, which was wrong in both directions at once: it could not see
+ * `project-5` or `project-6`, which exist, and it happily returned
+ * `project-3`, which does not — Hardstop was removed on 2026-08-29 when its
+ * repository was deleted. An event filed against a slug the register has never
+ * heard of does not surface anywhere. It is not an error, it is just lost.
+ *
+ * Routing the nicknames through the same check means the next project to be
+ * retired cannot leave this function pointing at a page that is not there.
+ */
 export function guessProject(summary: string): string | null {
   const text = summary.toLowerCase();
-  const match = /project[\s-]?([1-4])\b/.exec(text);
-  if (match) return `project-${match[1]}`;
-  if (text.includes('pseo') || text.includes('forge')) return 'project-1';
-  if (text.includes('store') || text.includes('storefront')) return 'project-2';
-  if (text.includes('heartbeat') || text.includes('dashboard')) return 'project-4';
+  const known = (slug: string) => (projectBySlug(slug) ? slug : null);
+
+  const match = /project[\s-]?(\d+)\b/.exec(text);
+  if (match) {
+    const slug = known(`project-${match[1]}`);
+    if (slug) return slug;
+  }
+
+  if (text.includes('pseo') || text.includes('forge')) return known('project-1');
+  if (text.includes('store') || text.includes('storefront')) return known('project-2');
+  if (text.includes('heartbeat') || text.includes('dashboard')) return known('project-4');
   return null;
 }
 
