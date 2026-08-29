@@ -24,6 +24,7 @@ import { isoStamp, isoDate, addDays } from './dates';
 import { fetchCalendar } from './connectors/calendar';
 import { syncProspects } from './prospects';
 import { pushQueuedDrafts } from './drafts';
+import { draftOutreach, waitingOnAnAddress } from './outreach';
 
 export type Cadence = 'fast' | 'hourly' | 'daily';
 
@@ -71,6 +72,31 @@ export async function runTick(cadence: Cadence): Promise<TickReport> {
     const live = snapshot.connectors.filter((c) => c.status === 'ok').length;
     return `${live}/${snapshot.connectors.length} connectors live`;
   });
+
+  // Hourly rather than every tick. Writing an email is not urgent in the way
+  // delivering one that is already written is, and a prospect whose address
+  // landed a minute ago is not waiting on the difference. It runs before the
+  // push so an email written now reaches Gmail in this tick, not the next one.
+  if (cadence === 'hourly' || cadence === 'daily') {
+    await step(report, 'outreach', async () => {
+      const result = await draftOutreach();
+      if (result.problem) return `skipped: ${result.problem}`;
+
+      // Reported every tick, written or not. A prospect the audit engine gave
+      // a real finding for and nobody has an address for is the one number
+      // that decides whether any of this produces an email — and it stayed
+      // invisible for three days while the queue read as simply empty.
+      const waiting = await waitingOnAnAddress();
+      const blocked = waiting > 0 ? `; ${waiting} more waiting on an address` : '';
+
+      if (result.eligible === 0) return `nobody to write to${blocked}`;
+      const noOpener =
+        result.skippedNoOpener > 0
+          ? `, ${result.skippedNoOpener} skipped with nothing checkable to open with`
+          : '';
+      return `${result.written} first email${result.written === 1 ? '' : 's'} written${noOpener}${blocked}`;
+    });
+  }
 
   // Every tick, not just the slow ones: a draft a human is waiting on should
   // not sit in a queue for an hour because it was written at five past.
