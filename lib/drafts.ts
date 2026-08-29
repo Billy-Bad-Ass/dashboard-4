@@ -176,7 +176,20 @@ export async function pushQueuedDrafts(fetchImpl: typeof fetch = fetch): Promise
       }),
     });
     if (!response.ok) {
-      const problem = `drafter answered HTTP ${response.status}`;
+      // The status alone was not enough to fix anything: three redeploys of the
+      // Apps Script produced the same 401 and no way to tell which of them was
+      // wrong. Google says which in the body, so keep a readable slice of it.
+      // Trimmed and length-capped because the body is often a full HTML page.
+      let detail = '';
+      try {
+        const text = await response.text();
+        detail = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+      } catch {
+        // A body that cannot be read is not worth failing the push over.
+      }
+      const problem = detail
+        ? `drafter answered HTTP ${response.status}: ${detail}`
+        : `drafter answered HTTP ${response.status}`;
       await noteProblem(queued, problem);
       return { ...idle, attempted: queued.length, problem };
     }
