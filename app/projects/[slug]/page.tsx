@@ -6,6 +6,7 @@ import { pulse, type ProjectPulse } from '@/lib/heartbeat';
 import { listProjectContacts } from '@/lib/crm';
 import { query } from '@/lib/db';
 import { formatMoney, formatPercent } from '@/lib/money';
+import { formatVital } from '@/lib/vitals';
 import { formatDate, relativeTime } from '@/lib/dates';
 import { PageHead } from '@/app/components/PageHead';
 import { Tile } from '@/app/components/Tile';
@@ -298,7 +299,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
                       label={spec?.label ?? key}
                       color={project.accent}
                       height={90}
-                      format={(v) => formatVital(v, spec?.unit)}
+                      // A metric with no spec is a series the register has
+                      // stopped describing — a renamed or retired vital whose
+                      // rows are still in `metrics`. Counting it is what
+                      // `formatVital` did for an undefined unit; the chart's
+                      // own default is money, which would be wrong here.
+                      unit={spec?.unit ?? 'count'}
                     />
                   </div>
                 );
@@ -435,14 +441,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
       </div>
     </>
   );
-}
-
-/** Shared by the vital tiles and the history charts so they cannot disagree. */
-function formatVital(value: number, unit: VitalSpec['unit'] | undefined): string {
-  if (unit === 'gbp') return formatMoney(value);
-  if (unit === 'percent') return `${value.toFixed(1)}%`;
-  if (unit === 'days') return `${Math.round(value)}d`;
-  return Math.round(value).toLocaleString('en-GB');
 }
 
 function VitalTile({

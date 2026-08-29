@@ -49,6 +49,21 @@ jobs:
       - name: Build the Worker bundle
         run: npm run cf:build
 
+      # And the bundle assembling does not mean it serves — the same sentence,
+      # one step further on. On 2026-08-29 every project page and /finance
+      # answered 500 in production while every step above was green. The crash
+      # was `format={(v) => …}` handed from a server component to a client one:
+      # legal TypeScript, compiles, bundles, and fails only when React tries to
+      # serialise the props — which is to say, when something renders the page.
+      # The first thing that noticed was Billy clicking a link on the live site.
+      #
+      # So this boots the Worker and asks it for every route. It seeds a
+      # throwaway local D1 first, because against an empty database the pages
+      # that crashed return a clean 200: every panel involved sits behind a
+      # `rows.length > 0` guard. See the note at the top of db/smoke.sql.
+      - name: Every route renders
+        run: npm run smoke
+
       - name: No secrets committed
         # Cheap belt-and-braces: the real protection is .gitignore and
         # `wrangler secret put`, but a pasted key should never reach a branch.

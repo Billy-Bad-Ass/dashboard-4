@@ -134,7 +134,7 @@ export default async function FinancePage() {
                     value,
                     color: spendColor(name),
                   }))}
-                  format={(v) => formatMoney(v)}
+                  unit="gbp"
                 />
                 <div className="stack" style={{ gap: 6, marginTop: 12 }}>
                   {categories.map(([name, value]) => (
