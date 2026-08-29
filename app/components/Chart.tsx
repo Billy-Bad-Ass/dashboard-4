@@ -25,7 +25,7 @@
 
 import { useId, useMemo, useRef, useState } from 'react';
 import { Icon } from './Icon';
-import { formatMoney } from '@/lib/money';
+import { formatVital, type VitalUnit } from '@/lib/vitals';
 import { formatDate } from '@/lib/dates';
 
 export interface ChartPoint {
@@ -40,8 +40,22 @@ export interface ChartProps {
   label: string;
   color?: string;
   height?: number;
-  /** How to render a value. Defaults to money, since most series here are money. */
-  format?: (value: number) => string;
+  /**
+   * What the numbers are, so the chart can write them down itself. Defaults to
+   * money, since most series here are money.
+   *
+   * This was `format?: (value: number) => string` until 2026-08-29, and it is a
+   * string now for a reason worth keeping. Every caller of this component is a
+   * server component, so a function here was a function crossing the server →
+   * client boundary, which React cannot serialise: each project page threw
+   * "Functions cannot be passed directly to Client Components" and answered a
+   * 500. See `lib/vitals.ts`.
+   *
+   * Nothing caught it because the crash needs *data*: with an empty database
+   * there is no metric history, the chart is never rendered, and the page is
+   * fine. See `db/smoke.sql`.
+   */
+  unit?: VitalUnit;
   /** Shown under the chart when every value is zero — the current reality. */
   emptyNote?: string;
 }
@@ -51,9 +65,10 @@ export function Chart({
   label,
   color = 'var(--accent)',
   height = 132,
-  format = (v) => formatMoney(v),
+  unit = 'gbp',
   emptyNote,
 }: ChartProps) {
+  const format = (value: number) => formatVital(value, unit);
   const [hover, setHover] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -266,14 +281,20 @@ function describe(points: ChartPoint[], format: (v: number) => string): string {
  * around a mark is data-weight ink doing a spacer's job. Each segment carries
  * its own hover, because on bars the mark is the hit target and there is no
  * meaningful X to crosshair.
+ *
+ * `unit` rather than a formatter function, for the same reason as `Chart` above
+ * — and this one was not hypothetical either. `/finance` passed
+ * `format={(v) => formatMoney(v)}` here and answered 500 on every request,
+ * unnoticed, because the only reported symptom was the project pages.
  */
 export function StackedBar({
   segments,
-  format = (v: number) => String(v),
+  unit = 'count',
 }: {
   segments: { label: string; value: number; color: string }[];
-  format?: (value: number) => string;
+  unit?: VitalUnit;
 }) {
+  const format = (value: number) => formatVital(value, unit);
   const [hover, setHover] = useState<string | null>(null);
   const total = segments.reduce((a, s) => a + s.value, 0);
 

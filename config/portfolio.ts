@@ -10,6 +10,8 @@
  * hardcoded in this file is a number that will be wrong by Thursday.
  */
 
+import type { VitalUnit } from '@/lib/vitals';
+
 /** How a project is supposed to make money. Drives which panels its page shows. */
 export type RevenueModel =
   | 'stripe' // direct sales — Stripe is the order record
@@ -84,7 +86,13 @@ export interface VitalSpec {
   label: string;
   /** Where the number comes from. `manual` means the D1 ledger or a form. */
   source: 'stripe' | 'github' | 'cloudflare' | 'ledger' | 'manual';
-  unit: 'gbp' | 'count' | 'percent' | 'days';
+  /**
+   * Declared in `lib/vitals.ts`, beside the formatter that reads it, so a chart
+   * can import the union without importing this register. The note there says
+   * why that separation matters: a client component may import a unit, but it
+   * must never be handed a formatter.
+   */
+  unit: VitalUnit;
   /** Higher is better, unless this is set. */
   lowerIsBetter?: boolean;
   /** What a healthy value looks like. Null when there is no meaningful target yet. */
@@ -94,6 +102,7 @@ export interface VitalSpec {
 
 /** Re-exported so there is exactly one place the currency is decided. */
 export { DEFAULT_CURRENCY as CURRENCY } from '@/lib/money';
+export type { VitalUnit } from '@/lib/vitals';
 
 /**
  * Money is stored and passed around in minor units, everywhere, always. `500`
