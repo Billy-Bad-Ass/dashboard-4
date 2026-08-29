@@ -253,66 +253,6 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
-    slug: 'project-3',
-    name: 'Hardstop',
-    tagline: 'Automated trading research. Refuses to risk money until a strategy survives testing.',
-    repo: 'Billy-Bad-Ass/trading-3',
-    stage: 'building',
-    revenueModel: 'none',
-    accent: '#B5179E',
-    icon: 'chart-line',
-    startedOn: '2026-08-23',
-    reality:
-      'Research, not a trading system. Nothing in the repository can place an order, send, ' +
-      'publish or spend — verified in the repository, not taken on trust: no broker, no ' +
-      'credential, no account, and a watchman check that flags any live trade lacking a risk ' +
-      'PASS. Topstep also bars remote servers from placing orders in its own terms, so on that ' +
-      'venue the block is the counterparty\'s as well as ours. It is back on Cloudflare as of ' +
-      '2026-08-23 — bba-trading-runner and bba-trading-watchman, both with a wrangler.toml and ' +
-      'a deploy-workers workflow. The earlier "moved off on 2026-08-21" note is superseded. ' +
-      '🔴 As of 2026-08-23 it has NO SURVIVING STRATEGY: both engines triggered on a close ' +
-      'beyond a level and then filled AT that level, buying the wick with the close\'s ' +
-      'hindsight. Fair fills killed the reversal outright (+2.82 to -6.92 points a trade) and ' +
-      'dropped ORB from +10.68 to +3.03, failing three gates. That is the system working. The ' +
-      'only unrefuted variant is a limit-order fill model that has not been built. Its ' +
-      'revenue model is deliberately ' +
-      '"none" — a strategy that has not survived honest testing is a liability, not an asset, ' +
-      'and putting a revenue tile on it would invite exactly the impatience it is built against.',
-    gates: [
-      'Find a strategy that survives out-of-sample testing without curve-fitting',
-      'Establish the null result honestly — most candidates should fail, and be seen to',
-      'Decide what evidence would justify risking real money, before there is any',
-      'Only then: a broker, a position size, and a human who presses the button',
-    ],
-    vitals: [
-      {
-        key: 'commits',
-        label: 'Commits',
-        source: 'github',
-        unit: 'count',
-        target: null,
-        hint: 'Research cadence. This project has no revenue signal by design.',
-      },
-      {
-        key: 'days_since_commit',
-        label: 'Days since commit',
-        source: 'github',
-        unit: 'days',
-        lowerIsBetter: true,
-        target: 14,
-        hint: 'Research that has stopped is research that has quietly been abandoned.',
-      },
-      {
-        key: 'ci_status',
-        label: 'Test suite',
-        source: 'github',
-        unit: 'count',
-        target: null,
-        hint: 'The fences are enforced by tests. A red suite means a fence may be down.',
-      },
-    ],
-  },
-  {
     slug: 'project-4',
     name: 'Heartbeat',
     tagline: 'This dashboard. The instrument panel for everything else.',
