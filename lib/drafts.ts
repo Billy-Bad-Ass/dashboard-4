@@ -119,6 +119,24 @@ interface DrafterReply {
  * queued: a row that silently retries forever is how a broken deployment looks
  * exactly like an empty queue.
  */
+/**
+ * Record why a push failed on the drafts it failed for, without failing them.
+ *
+ * They stay queued — a drafter that was down at :10 is usually up at :20, and
+ * marking them failed would mean a human requeuing each one by hand. But a
+ * queued draft with no reason on it is indistinguishable from one waiting its
+ * turn, and that is exactly how three drafts sat still for half an hour while
+ * the tick reported a problem nobody stored.
+ */
+async function noteProblem(drafts: Draft[], problem: string): Promise<void> {
+  for (const draft of drafts) {
+    await execute(`UPDATE drafts SET error = ? WHERE id = ? AND state = 'queued'`, [
+      problem,
+      draft.id,
+    ]);
+  }
+}
+
 export async function pushQueuedDrafts(fetchImpl: typeof fetch = fetch): Promise<PushResult> {
   const idle: PushResult = { attempted: 0, delivered: 0, failed: 0, problem: null };
 
@@ -158,21 +176,23 @@ export async function pushQueuedDrafts(fetchImpl: typeof fetch = fetch): Promise
       }),
     });
     if (!response.ok) {
-      return { ...idle, attempted: queued.length, problem: `drafter answered HTTP ${response.status}` };
+      const problem = `drafter answered HTTP ${response.status}`;
+      await noteProblem(queued, problem);
+      return { ...idle, attempted: queued.length, problem };
     }
     reply = (await response.json()) as DrafterReply;
   } catch (caught) {
     // The drafts stay queued: a network failure is not the draft's fault and
     // the next tick should try again.
-    return {
-      ...idle,
-      attempted: queued.length,
-      problem: caught instanceof Error ? caught.message : String(caught),
-    };
+    const problem = caught instanceof Error ? caught.message : String(caught);
+    await noteProblem(queued, problem);
+    return { ...idle, attempted: queued.length, problem };
   }
 
   if (!reply.ok) {
-    return { ...idle, attempted: queued.length, problem: reply.error ?? 'drafter refused' };
+    const problem = reply.error ?? 'drafter refused';
+    await noteProblem(queued, problem);
+    return { ...idle, attempted: queued.length, problem };
   }
 
   const byKey = new Map((reply.results ?? []).map((r) => [r.key, r]));
@@ -185,7 +205,13 @@ export async function pushQueuedDrafts(fetchImpl: typeof fetch = fetch): Promise
     // A draft the reply never mentions is left queued rather than guessed at.
     // Marking it delivered would hide a draft that never arrived; marking it
     // failed would re-send one that did.
-    if (!result) continue;
+    if (!result) {
+      await execute(`UPDATE drafts SET error = ? WHERE id = ?`, [
+        'the drafter\'s reply never mentioned this draft — neither confirmed nor refused',
+        draft.id,
+      ]);
+      continue;
+    }
 
     // "duplicate" means Apps Script already made this one — the last push
     // succeeded and only the answer was lost. That is a delivery, not a fault.
