@@ -33,7 +33,14 @@ wrangler r2 bucket create bba-heartbeat-archive
 ```
 
 Each prints an id. Paste them into `wrangler.jsonc`, replacing the
-`REPLACE_WITH_...` placeholders. **This is the step that gets skipped** — the
+`REPLACE_WITH_...` placeholders.
+
+There is a second D1 binding, `PRODUCTION_DB`, and it is **not** created here.
+It points at `bba-production` — BBA Production's own enquiry database, owned and
+migrated by the `bba-production-form` Worker in the `Code` repository. This
+dashboard only counts rows in it. If that binding is missing, BBA Production's
+enquiry tiles read as unknown rather than as zero, which is the difference
+between "nobody has asked" and "we did not look". **This is the step that gets skipped** — the
 dashboard runs perfectly well without a database and shows every stored figure
 as empty, so a missing binding looks like a quiet business rather than a
 misconfiguration. `/setup` says which it is.

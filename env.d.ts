@@ -3,6 +3,14 @@
 declare global {
   interface CloudflareEnv {
     DB: D1Database;
+    /**
+     * BBA Production's enquiry database, read-only.
+     *
+     * Optional because a dev session, a CI typecheck and a preview build all
+     * run without it, and BBA Production's tiles must read as unknown there
+     * rather than as zero enquiries.
+     */
+    PRODUCTION_DB?: D1Database;
     CACHE: KVNamespace;
     ARCHIVE: R2Bucket;
 

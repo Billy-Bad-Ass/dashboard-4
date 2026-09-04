@@ -23,6 +23,7 @@ import { PROJECTS, projectForCharge, type Project, type Stage } from '@/config/p
 import { getCache, query, execute, hasDatabase } from './db';
 import { loadFinance, type PortfolioFinance, type ProjectFinance } from './finance';
 import { loadPipeline, type PipelineSummary } from './crm';
+import { loadEnquiries, type EnquirySnapshot } from './enquiries';
 import { fetchStripe, type StripeSnapshot } from './connectors/stripe';
 import { fetchAllRepoPulses, type RepoPulse } from './connectors/github';
 import { fetchCloudflare, type CloudflareSnapshot } from './connectors/cloudflare';
@@ -252,6 +253,7 @@ export function resolveVitals(
   lastCronMinutes: number | null,
   connectorsLive: number,
   cloudflare: CloudflareSnapshot | null = null,
+  enquiries: EnquirySnapshot | null = null,
 ): Record<string, number | null> {
   const out: Record<string, number | null> = {};
   const daysSinceCommit = repo?.lastCommitAt
@@ -310,6 +312,19 @@ export function resolveVitals(
         out[vital.key] = project.cloudflareScript
           ? (cloudflare?.byScript.find((s) => s.script === project.cloudflareScript)?.requests ??
             null)
+          : null;
+        break;
+      case 'enquiries':
+      case 'enquiries_new':
+        // Read live from BBA Production's own database rather than waiting for
+        // the hourly snapshot: this is the tile somebody looks at to answer
+        // "has anyone asked to buy anything", and an hour-old answer to that
+        // question is the reason the tile was worth adding. Null when the
+        // second binding is absent — unknown, not none.
+        out[vital.key] = enquiries
+          ? vital.key === 'enquiries'
+            ? enquiries.total
+            : enquiries.unanswered
           : null;
         break;
       case 'run_cost':
@@ -420,7 +435,7 @@ export async function pulse(options: { fresh?: boolean } = {}): Promise<Pulse> {
     safe(() => cached('calendar', ttl, () => fetchCalendar()), 'Calendar'),
   ]);
 
-  const [finance, pipeline, stored, agentRuns, agentLastRuns, lastCron] = await Promise.all([
+  const [finance, pipeline, stored, agentRuns, agentLastRuns, lastCron, enquiries] = await Promise.all([
     loadFinance(),
     loadPipeline(),
     latestMetrics(),
@@ -445,6 +460,10 @@ export async function pulse(options: { fresh?: boolean } = {}): Promise<Pulse> {
     query<{ checked_at: string }>(
       'SELECT checked_at FROM heartbeats ORDER BY checked_at DESC LIMIT 1',
     ),
+    // A second database, so a second way to fail: no binding, or a binding to a
+    // database whose table has not been created yet. Neither is worth taking
+    // the whole dashboard down for, and null already means unknown here.
+    loadEnquiries().catch(() => null),
   ]);
 
   const connectors: ConnectorHealth[] = [
@@ -492,6 +511,7 @@ export async function pulse(options: { fresh?: boolean } = {}): Promise<Pulse> {
         lastCronMinutes,
         connectorsLive,
         cloudflareResult.data,
+        enquiries,
       ),
       health: verdict.health,
       healthReason: verdict.reason,
