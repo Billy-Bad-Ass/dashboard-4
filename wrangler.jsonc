@@ -46,6 +46,17 @@
       // Replace with the id printed by `wrangler d1 create bba-heartbeat`.
       "database_id": "a57d42d4-701d-4a24-8143-3271c0d4de86",
       "migrations_dir": "db/migrations"
+    },
+    {
+      // BBA Production's enquiry database, read-only in practice: this
+      // dashboard counts what the form took, it never writes to it. No
+      // migrations_dir — that schema is owned and applied by the
+      // bba-production-form Worker's own deploy, in the Code repository, and
+      // pointing a second migration runner at it is how two deploys start
+      // fighting over one table.
+      "binding": "PRODUCTION_DB",
+      "database_name": "bba-production",
+      "database_id": "b6322b47-8b5e-43e3-a68f-9267c0fafea5"
     }
   ],
 

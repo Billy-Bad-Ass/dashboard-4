@@ -427,6 +427,85 @@ export const PROJECTS: Project[] = [
       },
     ],
   },
+  {
+    slug: 'project-7',
+    name: 'BBA Production',
+    tagline: 'Finished software, sold as a copy the buyer owns. Quoted per project.',
+    // The only business here whose code lives inside another repository, under
+    // Code/bba-production/. So this repo's commit cadence covers more than this
+    // business does, and "days since commit" reads high-side for it by design —
+    // better than pointing at a repository that does not exist, which is the
+    // bug #21 fixed for everyone else.
+    repo: 'Billy-Bad-Ass/Code',
+    cloudflareScript: 'bba-production-form',
+    stage: 'shipped',
+    revenueModel: 'services',
+    accent: '#B3245E',
+    icon: 'handshake',
+    liveUrl: 'https://production.bbanetwork.org',
+    startedOn: '2026-09-03',
+    reality:
+      'Live at production.bbanetwork.org since 2026-09-03, confirmed from a GitHub runner ' +
+      'serving its own page rather than merely answering 200. The public site and the enquiry ' +
+      'form are one Worker, bba-production-form, writing to its own D1 database. It has quoted ' +
+      'nothing and sold nothing yet, so every tile here except the enquiry count is a leading ' +
+      'indicator. The enquiry count is the one that matters: work is quoted per project, which ' +
+      'means the funnel starts with somebody filling in a form and stops dead if nobody reads ' +
+      'it. Until this entry existed there was no tile anywhere that went up when they did — ' +
+      'the only way to find an enquiry was to query the database by hand and remember to.',
+    gates: [
+      'Take one enquiry from somebody who is not Billy',
+      'Quote one job in writing before any work starts — the scope is the whole business model',
+      'Sell one copy and record it in the ledger, so revenue here stops being a ledger zero',
+      'Put a price on the catalog. "Quoted per project" is honest and it is also a stall',
+    ],
+    vitals: [
+      {
+        key: 'enquiries_new',
+        label: 'Waiting on you',
+        source: 'ledger',
+        unit: 'count',
+        lowerIsBetter: true,
+        target: 0,
+        hint:
+          'Enquiries still marked NEW in the production database. Each one is somebody who ' +
+          'asked to buy something and has not been answered.',
+      },
+      {
+        key: 'enquiries',
+        label: 'Enquiries',
+        source: 'ledger',
+        unit: 'count',
+        target: null,
+        hint: 'Everything the form has ever taken. Zero visitors and zero enquiries is a distribution problem.',
+      },
+      {
+        key: 'visitors',
+        label: 'Visitors',
+        source: 'cloudflare',
+        unit: 'count',
+        target: null,
+        hint: 'Requests to the bba-production-form Worker over the last 7 days — the site and the form are the same Worker.',
+      },
+      {
+        key: 'revenue',
+        label: 'Revenue',
+        source: 'ledger',
+        unit: 'gbp',
+        target: null,
+        hint: 'Invoiced work, from the D1 ledger. There is no Stripe product behind this one — every job is quoted.',
+      },
+      {
+        key: 'days_since_commit',
+        label: 'Days since commit',
+        source: 'github',
+        unit: 'days',
+        lowerIsBetter: true,
+        target: 14,
+        hint: 'Days since the Code repository last moved. Shared with the workspace, so read it as a floor.',
+      },
+    ],
+  },
 ];
 
 /** What a Stripe charge needs to expose for attribution. */
